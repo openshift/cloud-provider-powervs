@@ -109,6 +109,14 @@ type Provider struct {
 	IamEndpointOverride string `gcfg:"iamEndpointOverride"`
 	// Optional: Resource Manager endpoint override URL
 	RmEndpointOverride string `gcfg:"rmEndpointOverride"`
+	// PowerVSCloudInstanceID is IBM Power VS service instance id
+	PowerVSCloudInstanceID string `gcfg:"powerVSCloudInstanceID"`
+	// PowerVSCloudInstanceName is IBM Power VS service instance name
+	PowerVSCloudInstanceName string `gcfg:"powerVSCloudInstanceName"`
+	// PowerVSRegion is IBM Power VS service region
+	PowerVSRegion string `gcfg:"powerVSRegion"`
+	// PowerVSZone is IBM Power VS service zone
+	PowerVSZone string `gcfg:"powerVSZone"`
 }
 
 // CloudConfig is the ibm cloud provider config data.
