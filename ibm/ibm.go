@@ -102,6 +102,12 @@ type Provider struct {
 	// List of VPC subnet names. Required when configured to get node
 	// data from VPC.
 	G2VpcSubnetNames string `gcfg:"g2VpcSubnetNames"`
+	// PowerVSCloudInstanceID is IBM Power VS service instance id
+	PowerVSCloudInstanceID string `gcfg:"powerVSCloudInstanceID"`
+	// PowerVSRegion is IBM Power VS service region
+	PowerVSRegion string `gcfg:"powerVSRegion"`
+	// PowerVSZone is IBM Power VS service zone
+	PowerVSZone string `gcfg:"powerVSZone"`
 }
 
 // CloudConfig is the ibm cloud provider config data.
