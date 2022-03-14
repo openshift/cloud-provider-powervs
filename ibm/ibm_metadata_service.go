@@ -53,6 +53,7 @@ type MetadataService struct {
 	provider       Provider
 	kubeClient     kubernetes.Interface
 	vpcClient      *vpcClient
+	powerVSClient  *ibmPowerVSClient
 	nodeMap        map[string]NodeMetadata
 	nodeMapMux     sync.Mutex
 	nodeCacheStart time.Time
@@ -200,21 +201,38 @@ func (ms *MetadataService) GetNodeMetadata(name string, applyNetworkUnavailable 
 		ms.putCachedNode(name, newNode)
 		return newNode, nil
 	} else if isProviderVpc(ms.provider.ProviderType) {
-		// labels were not set; if VPC we can try to call api for values
-		klog.Infof("Retrieving information for node=" + name + " from VPC")
+		if isProviderPowerVS(ms.provider) {
+			klog.Infof("Retrieving information for node=" + name + " from Power VS ")
+			if ms.powerVSClient == nil {
+				ms.powerVSClient, err = newPowerVSClient(&ms.provider)
+				if err != nil {
+					klog.Errorf("Failed to create new PowerVS client Error: %v", err)
+					return node, err
+				}
+			}
+			// gather node information from Power VS
+			err = ms.powerVSClient.populateNodeMetadata(name, &newNode)
+			if err != nil {
+				klog.Errorf("Failed to populate metadata for PowerVS node %s Error: %v", name, err)
+				return node, err
+			}
+		} else {
+			// labels were not set; if VPC we can try to call api for values
+			klog.Infof("Retrieving information for node=" + name + " from VPC")
 
-		// create vpcClient if we haven't already
-		if ms.vpcClient == nil {
-			ms.vpcClient, err = newVpcClient(ms.provider)
+			// create vpcClient if we haven't already
+			if ms.vpcClient == nil {
+				ms.vpcClient, err = newVpcClient(ms.provider)
+				if err != nil {
+					return node, err
+				}
+			}
+
+			// gather node information from VPC
+			err = ms.vpcClient.populateNodeMetadata(name, &newNode)
 			if err != nil {
 				return node, err
 			}
-		}
-
-		// gather node information from VPC
-		err = ms.vpcClient.populateNodeMetadata(name, &newNode)
-		if err != nil {
-			return node, err
 		}
 
 		ms.putCachedNode(name, newNode)
