@@ -94,6 +94,12 @@ type Provider struct {
 	// File containing VPC credentials. Required when configured to get node
 	// data from VPC.
 	G2Credentials string `gcfg:"g2Credentials"`
+	// PowerVSCloudInstanceID is IBM Power VS service instance id
+	PowerVSCloudInstanceID string `gcfg:"powerVSCloudInstanceID"`
+	// PowerVSRegion is IBM Power VS service region
+	PowerVSRegion string `gcfg:"powerVSRegion"`
+	// PowerVSZone is IBM Power VS service zone
+	PowerVSZone string `gcfg:"powerVSZone"`
 }
 
 // CloudConfig is the ibm cloud provider config data.
