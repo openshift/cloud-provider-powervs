@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/utils/pointer"
 )
 
 var (
@@ -54,11 +55,14 @@ var (
 )
 
 func getLoadBalancerService(lbName string) *v1.Service {
-	s := &v1.Service{}
-	s.ObjectMeta.UID = types.UID(lbName)
-	s.ObjectMeta.Name = lbName
-	s.ObjectMeta.Namespace = lbDeploymentNamespace
-	s.ObjectMeta.SelfLink = "/apis/apps/v1/namespaces/" + lbDeploymentNamespace + "/services/" + lbName
+	s := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       types.UID(lbName),
+			Name:      lbName,
+			Namespace: lbDeploymentNamespace,
+			SelfLink:  "/apis/apps/v1/namespaces/" + lbDeploymentNamespace + "/services/" + lbName,
+		},
+	}
 	s.Annotations = map[string]string{}
 	s.Spec.Type = v1.ServiceTypeLoadBalancer
 	s.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: "1.1.1.1"}}
@@ -2026,6 +2030,76 @@ func TestEnsureLoadBalancer(t *testing.T) {
 		t.Fatalf("Unexpected load balancer 'test' status: %v", status.Ingress[0].IP)
 	}
 
+	// Update the LB deployment keepalived Image
+	d, err = c.getLoadBalancerDeployment(getTestLoadBlancerName("test"))
+	if nil == d || nil != err {
+		t.Fatalf("Unexpected error finding load balancer 'new': %v, %v", d, err)
+	}
+	d.Spec.Template.Spec.Containers[0].Image = "registry.ng.bluemix.net/armada-master/keepalived:0000"
+	d.Spec.Template.Spec.InitContainers[0].Image = "registry.ng.bluemix.net/armada-master/keepalived:0000"
+	_, err = c.KubeClient.AppsV1().Deployments(d.ObjectMeta.Namespace).Update(context.TODO(), d, metav1.UpdateOptions{})
+	if nil != err {
+		t.Fatalf("Unexpected error updating load balancer 'new': %v", err)
+	}
+	status, err = c.EnsureLoadBalancer(context.Background(), clusterName, getLoadBalancerService("test"), nil)
+	if nil == status || nil != err {
+		t.Fatalf("Unexpected error ensure load balancer 'new' updated: %v, %v", status, err)
+	}
+	d, err = c.getLoadBalancerDeployment(getTestLoadBlancerName("test"))
+	if nil == d || nil != err {
+		t.Fatalf("Unexpected error finding load balancer 'new': %v, %v", d, err)
+	}
+	if d.Spec.Template.Spec.Containers[0].Image != c.Config.LBDeployment.Image {
+		t.Fatalf("Unexpected error updating load balancer deployment keepalived container Image: %v", d.Spec.Template.Spec.Containers[0].Image)
+	}
+	if d.Spec.Template.Spec.InitContainers[0].Image != c.Config.LBDeployment.Image {
+		t.Fatalf("Unexpected error updating load balancer deployment keepalived Init container Image: %v", d.Spec.Template.Spec.Containers[0].Image)
+	}
+
+	// Don't update LB deployment if keepalived image version is higher than cloud config keepalived image version 1328
+	d.Spec.Template.Spec.Containers[0].Image = "registry.ng.bluemix.net/armada-master/keepalived:9999"
+	d.Spec.Template.Spec.InitContainers[0].Image = "registry.ng.bluemix.net/armada-master/keepalived:9999"
+	_, err = c.KubeClient.AppsV1().Deployments(d.ObjectMeta.Namespace).Update(context.TODO(), d, metav1.UpdateOptions{})
+	if nil != err {
+		t.Fatalf("Unexpected error updating load balancer 'new': %v", err)
+	}
+	status, err = c.EnsureLoadBalancer(context.Background(), clusterName, getLoadBalancerService("test"), nil)
+	if nil == status || nil != err {
+		t.Fatalf("Unexpected error ensure load balancer 'new' updated: %v, %v", status, err)
+	}
+	d, err = c.getLoadBalancerDeployment(getTestLoadBlancerName("test"))
+	if nil == d || nil != err {
+		t.Fatalf("Unexpected error finding load balancer 'new': %v, %v", d, err)
+	}
+	if d.Spec.Template.Spec.Containers[0].Image == c.Config.LBDeployment.Image {
+		t.Fatalf("Unexpected error updating load balancer deployment keepalived container Image: %v", d.Spec.Template.Spec.Containers[0].Image)
+	}
+	if d.Spec.Template.Spec.InitContainers[0].Image == c.Config.LBDeployment.Image {
+		t.Fatalf("Unexpected error updating load balancer deployment keepalived Init container Image: %v", d.Spec.Template.Spec.Containers[0].Image)
+	}
+
+	// Update LB deployment image if non numeric image values doesn't match with cluster provider config image
+	d.Spec.Template.Spec.Containers[0].Image = "registry.ng.bluemix.net/armada-master/keepalived:xyz"
+	d.Spec.Template.Spec.InitContainers[0].Image = "registry.ng.bluemix.net/armada-master/keepalived:xyz"
+	_, err = c.KubeClient.AppsV1().Deployments(d.ObjectMeta.Namespace).Update(context.TODO(), d, metav1.UpdateOptions{})
+	if nil != err {
+		t.Fatalf("Unexpected error updating load balancer 'new': %v", err)
+	}
+	status, err = c.EnsureLoadBalancer(context.Background(), clusterName, getLoadBalancerService("test"), nil)
+	if nil == status || nil != err {
+		t.Fatalf("Unexpected error ensure load balancer 'new' updated: %v, %v", status, err)
+	}
+	d, err = c.getLoadBalancerDeployment(getTestLoadBlancerName("test"))
+	if nil == d || nil != err {
+		t.Fatalf("Unexpected error finding load balancer 'new': %v, %v", d, err)
+	}
+	if d.Spec.Template.Spec.Containers[0].Image != c.Config.LBDeployment.Image {
+		t.Fatalf("Unexpected error updating load balancer deployment keepalived container Image: %v", d.Spec.Template.Spec.Containers[0].Image)
+	}
+	if d.Spec.Template.Spec.InitContainers[0].Image != c.Config.LBDeployment.Image {
+		t.Fatalf("Unexpected error updating load balancer deployment keepalived Init container Image: %v", d.Spec.Template.Spec.Containers[0].Image)
+	}
+
 	// MixedProtocol (i.e. both TCP and UDP ports) is NOT supportd for now
 	status, err = c.EnsureLoadBalancer(context.Background(), clusterName, getLoadBalancerMixedService("testMixed"), nil)
 	if nil == status && err != nil {
@@ -3531,6 +3605,39 @@ func TestEnsureLoadBalancerDeleted(t *testing.T) {
 	result, err = c.KubeClient.CoreV1().ConfigMaps(lbDeploymentNamespace).Get(context.TODO(), cmName, metav1.GetOptions{})
 	if result != nil || err == nil {
 		t.Fatalf("Unexpected error in ensuring deleted load balancer 'testIPVSDeleteCM'. Configmap found: %v", cmName)
+	}
+}
+
+func TestFilterLoadBalancersFromServiceList(t *testing.T) {
+	c, _, _ := getTestCloud()
+
+	services, err := c.KubeClient.CoreV1().Services(v1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+	if nil != err {
+		t.Fatalf("Failed to list load balancer services: %v", err)
+	}
+
+	num := len(services.Items)
+	expectedNum := 12 // Count every service
+	if expectedNum != num {
+		t.Fatalf("The number of services: %v is not equal with the expected value: %v", num, expectedNum)
+	}
+
+	filterLoadBalancersFromServiceList(services)
+	num = len(services.Items)
+	expectedNum = 11 // Count of load balanacer services
+	if expectedNum != num {
+		t.Fatalf("The number of services: %v is not equal with the expected value: %v", num, expectedNum)
+	}
+
+	// Choose two "random" load balancers (4th and 9th) and set their load balancer class
+	// Filter out these load balancer services
+	services.Items[4].Spec.LoadBalancerClass = pointer.String("dummylb.io")
+	services.Items[9].Spec.LoadBalancerClass = pointer.String("dummylb.io")
+	filterLoadBalancersFromServiceList(services)
+	num = len(services.Items)
+	expectedNum = 9 // Count of load balancer services without load balancer class
+	if expectedNum != num {
+		t.Fatalf("The number of services: %v is not equal with the expected value: %v", num, expectedNum)
 	}
 }
 

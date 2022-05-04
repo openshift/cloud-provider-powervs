@@ -31,6 +31,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -71,11 +72,11 @@ const (
 	lbNoIPsMessage                      = lbNoIPsBaseMessage + " Add a portable subnet to the cluster and try again."
 	lbPortableSubnetMessage             = lbNoIPsBaseMessage + " Resolve the following issues then add a portable subnet to the cluster: "
 	lbLiteClusterMessage                = "Clusters with one node must use services of type NodePort."
-	lbDocBaseURL                        = "https://cloud.ibm.com/"
-	lbDocDefaultNetworkURL              = lbDocBaseURL + "docs/containers?topic=containers-cs_troubleshoot_lb"
-	lbDocSupportedSchedulers            = lbDocBaseURL + "docs/containers?topic=containers-loadbalancer#scheduling"
-	lbDocReferenceMessage               = "See " + lbDocDefaultNetworkURL + " for details."
-	lbDocTroubleshootMessage            = "For more information read the troubleshooting cluster networking doc: " + lbDocDefaultNetworkURL
+	lbDocIKSNetworkURL                  = "https://ibm.biz/lb-debug"
+	lbDocROKSNetworkURL                 = "https://ibm.biz/oc-lb-debug"
+	lbDocSupportedSchedulers            = "https://ibm.biz/lbv2-scheduling"
+	lbDocReferenceMessage               = "See " + lbDocIKSNetworkURL + "(IKS) or " + lbDocROKSNetworkURL + " (Openshift) for more details."
+	lbDocTroubleshootMessage            = "For more information read the troubleshooting cluster networking doc: " + lbDocIKSNetworkURL + " (IKS) or " + lbDocROKSNetworkURL + " (Openshift)"
 	lbDocUnsupportedScheduler           = "For more information read the supported scheduler doc: " + lbDocSupportedSchedulers
 	lbUnsupportedScheduler              = "You have specified an unsupported scheduler: %s. Supported schedulers are: %s. " + lbDocUnsupportedScheduler
 	lbDefaultNoIPPortableSubnetErrorMsg = lbNoIPsMessage + " " + lbDocReferenceMessage
@@ -500,8 +501,21 @@ func (c *Cloud) updateLoadBalancerDeployment(lbLogName string, lbDeployment *app
 	}
 
 	if 1 == len(lbDeployment.Spec.Template.Spec.Containers) {
-		// Update the load balancer deployment if a new image is available.
-		if 0 != strings.Compare(c.Config.LBDeployment.Image, lbDeployment.Spec.Template.Spec.Containers[0].Image) {
+		updateImage := false
+		lbDeploymentImageList := strings.Split(lbDeployment.Spec.Template.Spec.Containers[0].Image, ":")
+		configImageList := strings.Split(c.Config.LBDeployment.Image, ":")
+		// Update the load balancer deployment Container if a latest image is available.
+		if len(lbDeploymentImageList) > 1 && len(configImageList) > 1 {
+			lbDeploymentImageValue, _ := strconv.Atoi(lbDeploymentImageList[1])
+			configImageValue, _ := strconv.Atoi(configImageList[1])
+			if lbDeploymentImageValue < configImageValue {
+				updateImage = true
+			}
+		} else if c.Config.LBDeployment.Image != lbDeployment.Spec.Template.Spec.Containers[0].Image {
+			updateImage = true
+		}
+		if updateImage {
+			klog.Infof("Updating LB deployment container image to %v", c.Config.LBDeployment.Image)
 			updatesRequired = append(updatesRequired, "Image")
 			// Always use the new image.
 			lbDeployment.Spec.Template.Spec.Containers[0].Image = c.Config.LBDeployment.Image
@@ -560,9 +574,22 @@ func (c *Cloud) updateLoadBalancerDeployment(lbLogName string, lbDeployment *app
 			},
 		}
 	} else {
+		updateInitImage := false
+		lbDeploymentInitImageList := strings.Split(lbDeployment.Spec.Template.Spec.InitContainers[0].Image, ":")
+		configImageList := strings.Split(c.Config.LBDeployment.Image, ":")
 		// The initContainer exists. Update the load balancer deployment initContainer if a new image is available.
-		klog.Infof("Updating initContainer image for %v", lbDeployment.Name)
-		if 0 != strings.Compare(c.Config.LBDeployment.Image, lbDeployment.Spec.Template.Spec.InitContainers[0].Image) {
+		if len(lbDeploymentInitImageList) > 1 && len(configImageList) > 1 {
+			lbDeploymentInitImageValue, _ := strconv.Atoi(lbDeploymentInitImageList[1])
+			configImageValue, _ := strconv.Atoi(configImageList[1])
+			if lbDeploymentInitImageValue < configImageValue {
+				updateInitImage = true
+			}
+		} else if c.Config.LBDeployment.Image != lbDeployment.Spec.Template.Spec.InitContainers[0].Image {
+			updateInitImage = true
+		}
+
+		if updateInitImage {
+			klog.Infof("Updating LB deployment Initcontainer image to %v", c.Config.LBDeployment.Image)
 			updatesRequired = append(updatesRequired, "InitContainer-New-Image")
 			// Always use the new image.
 			lbDeployment.Spec.Template.Spec.InitContainers[0].Image = c.Config.LBDeployment.Image
@@ -1197,8 +1224,8 @@ func (c *Cloud) deleteCalicoIngressPolicy(service *v1.Service) error {
 // *v1.Service parameter as read-only and not modify it.
 func (c *Cloud) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
 	// For a VPC cluster, we use a slightly different load balancer name
-	if isProviderVpc(c.Config.Prov.ProviderType) {
-		return c.getVpcLoadBalancerName(service)
+	if c.isProviderVpc() {
+		return c.vpcGetLoadBalancerName(service)
 	}
 	return GetCloudProviderLoadBalancerName(service)
 }
@@ -1209,8 +1236,8 @@ func (c *Cloud) GetLoadBalancerName(ctx context.Context, clusterName string, ser
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (c *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	// Invoke VPC specific logic if this is a VPC cluster
-	if isProviderVpc(c.Config.Prov.ProviderType) {
-		return c.getVpcLoadBalancer(ctx, clusterName, service)
+	if c.isProviderVpc() {
+		return c.VpcGetLoadBalancer(ctx, clusterName, service)
 	}
 	lbName := GetCloudProviderLoadBalancerName(service)
 	klog.Infof("GetLoadBalancer(%v, %v)", lbName, clusterName)
@@ -1323,8 +1350,8 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, serv
 	}
 
 	// Invoke VPC specific logic if this is a VPC cluster
-	if isProviderVpc(c.Config.Prov.ProviderType) {
-		return c.ensureVpcLoadBalancer(ctx, clusterName, service, nodes)
+	if c.isProviderVpc() {
+		return c.VpcEnsureLoadBalancer(ctx, clusterName, service, nodes)
 	}
 
 	var lbLogName string
@@ -1908,8 +1935,8 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, serv
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (c *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	// Invoke VPC specific logic if this is a VPC cluster
-	if isProviderVpc(c.Config.Prov.ProviderType) {
-		return c.updateVpcLoadBalancer(ctx, clusterName, service, nodes)
+	if c.isProviderVpc() {
+		return c.VpcUpdateLoadBalancer(ctx, clusterName, service, nodes)
 	}
 	klog.Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, service, len(nodes))
 
@@ -1971,8 +1998,8 @@ func (c *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, serv
 // Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
 	// Invoke VPC specific logic if this is a VPC cluster
-	if isProviderVpc(c.Config.Prov.ProviderType) {
-		return c.ensureVpcLoadBalancerDeleted(ctx, clusterName, service)
+	if c.isProviderVpc() {
+		return c.VpcEnsureLoadBalancerDeleted(ctx, clusterName, service)
 	}
 	lbName := GetCloudProviderLoadBalancerName(service)
 	klog.Infof("EnsureLoadBalancerDeleted(%v, %v)", lbName, clusterName)
@@ -2120,6 +2147,18 @@ func replicaSetHasDesiredReplicas(clientset clientset.Interface, replicaSet *app
 	}
 }
 
+// Filter the services list to just contain the load balancers without defined load balancer class and nothing else.
+func filterLoadBalancersFromServiceList(services *v1.ServiceList) {
+	var lbItems []v1.Service
+	for i := range services.Items {
+		if services.Items[i].Spec.Type == v1.ServiceTypeLoadBalancer &&
+			services.Items[i].Spec.LoadBalancerClass == nil {
+			lbItems = append(lbItems, services.Items[i])
+		}
+	}
+	services.Items = lbItems
+}
+
 // MonitorLoadBalancers monitors load balancer services to ensure that they
 // are working properly. This is a cloud task run via ticker.
 func MonitorLoadBalancers(c *Cloud, data map[string]string) {
@@ -2134,9 +2173,14 @@ func MonitorLoadBalancers(c *Cloud, data map[string]string) {
 		return
 	}
 
+	// Filtering out the services which type is not load blancer and also filtering out
+	// the load blanacer services which has got defined load blancer class.
+	// The ServiceList struct was modified in place so there is no returning value
+	filterLoadBalancersFromServiceList(services)
+
 	// Invoke VPC specific logic if this is a VPC cluster
-	if isProviderVpc(c.Config.Prov.ProviderType) {
-		monitorVpcLoadBalancers(c, services, data, triggerEvent)
+	if c.isProviderVpc() {
+		c.VpcMonitorLoadBalancers(services, data)
 		return
 	}
 
@@ -2146,8 +2190,7 @@ func MonitorLoadBalancers(c *Cloud, data map[string]string) {
 	// be monitored since those actions will do the appropriate error
 	// handling and event generation.
 	for i := range services.Items {
-		if services.Items[i].Spec.Type == v1.ServiceTypeLoadBalancer &&
-			0 != len(services.Items[i].Status.LoadBalancer.Ingress) &&
+		if 0 != len(services.Items[i].Status.LoadBalancer.Ingress) &&
 			0 != len(services.Items[i].Status.LoadBalancer.Ingress[0].IP) {
 
 			lbName := GetCloudProviderLoadBalancerName(&services.Items[i])
