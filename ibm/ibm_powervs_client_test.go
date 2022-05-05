@@ -74,3 +74,15 @@ func (p *powerVSTestClient) GetInstances() (*models.PVMInstances, error) {
 		},
 	}}, nil
 }
+
+func (p *powerVSTestClient) GetNetworks() (*models.Networks, error) {
+	return nil, nil
+}
+
+func (p *powerVSTestClient) GetDHCPServers() (models.DHCPServers, error) {
+	return nil, nil
+}
+
+func (p *powerVSTestClient) GetDHCPServerByID(string) (*models.DHCPServerDetail, error) {
+	return nil, nil
+}
