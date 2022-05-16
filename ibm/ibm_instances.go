@@ -72,9 +72,8 @@ func (c *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.No
 	if len(externalIP) == 0 {
 		externalIP = nodeMd.InternalIP
 	}
-
-	// add ips to node address only if they are non-empty
-	var nodeAddress []v1.NodeAddress
+	// Build and return node nodeaddresses - if they are non-empty
+	nodeAddress := []v1.NodeAddress{}
 	if len(nodeMd.InternalIP) > 0 {
 		nodeAddress = append(nodeAddress, v1.NodeAddress{Type: v1.NodeInternalIP, Address: nodeMd.InternalIP})
 	}
@@ -254,9 +253,8 @@ func (c *Cloud) nodeAddressesV2(ctx context.Context, nodeMD NodeMetadata) []v1.N
 	if len(externalIP) == 0 {
 		externalIP = nodeMD.InternalIP
 	}
-
-	// add ips to node address only if they are non-empty
-	var nodeAddress []v1.NodeAddress
+	// Build and return node nodeaddresses - if they are non-empty
+	nodeAddress := []v1.NodeAddress{}
 	if len(nodeMD.InternalIP) > 0 {
 		nodeAddress = append(nodeAddress, v1.NodeAddress{Type: v1.NodeInternalIP, Address: nodeMD.InternalIP})
 	}
