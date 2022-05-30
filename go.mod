@@ -3,9 +3,9 @@ module cloud.ibm.com/cloud-provider-ibm
 go 1.18
 
 require (
-	github.com/IBM-Cloud/power-go-client v1.1.8
-	github.com/IBM/go-sdk-core/v5 v5.9.5
-	github.com/IBM/platform-services-go-sdk v0.24.1
+	github.com/IBM-Cloud/power-go-client v1.1.9
+	github.com/IBM/go-sdk-core/v5 v5.10.1
+	github.com/IBM/platform-services-go-sdk v0.25.1
 	github.com/IBM/vpc-go-sdk v0.19.0
 	github.com/go-openapi/strfmt v0.21.2
 	github.com/spf13/cobra v1.4.0
