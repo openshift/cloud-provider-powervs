@@ -95,6 +95,10 @@ type ConfigVpc struct {
 	SubnetNames       string
 	WorkerAccountID   string // Not used, ignored
 	VpcName           string
+	ServiceOverride   map[string]*struct {
+		Service string
+		URL     string
+	}
 	// Internal config settings
 	endpointURL      string
 	resourceGroupID  string
@@ -103,6 +107,9 @@ type ConfigVpc struct {
 
 // getIamEndpoint - retrieve the correct IAM endpoint for the current config
 func (c *ConfigVpc) getIamEndpoint() string {
+	if exist, iamEndpoint := c.getServiceOverrideEndpoint("iam"); exist {
+		return iamEndpoint
+	}
 	if strings.Contains(c.Region, "stage") {
 		if c.EnablePrivate {
 			return iamStagePrivateTokenExchangeURL
@@ -117,6 +124,9 @@ func (c *ConfigVpc) getIamEndpoint() string {
 
 // getVpcEndpoint - retrieve the correct VPC endpoint for the current config
 func (c *ConfigVpc) getVpcEndpoint() string {
+	if exist, vpcEndpoint := c.getServiceOverrideEndpoint("vpc"); exist {
+		return vpcEndpoint
+	}
 	endpoint := vpcEndpointIaaSProdURL
 	if strings.Contains(c.Region, "stage") {
 		endpoint = vpcEndpointIaaSStageURL
@@ -125,6 +135,19 @@ func (c *ConfigVpc) getVpcEndpoint() string {
 		return fmt.Sprintf("https://%s.%s.%s", c.Region, "private", endpoint)
 	}
 	return fmt.Sprintf("https://%s.%s", c.Region, endpoint)
+}
+
+// getServiceOverrideEndpoint looks for URL for the provided endpointName name ServiceOverride
+func (c *ConfigVpc) getServiceOverrideEndpoint(endpointName string) (bool, string) {
+	if len(c.ServiceOverride) == 0 {
+		return false, ""
+	}
+	for _, service := range c.ServiceOverride {
+		if strings.TrimSpace(service.Service) == endpointName {
+			return true, strings.TrimSpace(service.URL)
+		}
+	}
+	return false, ""
 }
 
 // initialize - initialize VPC config fields that were not set by the cloud provider

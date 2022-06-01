@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	gcfg "gopkg.in/gcfg.v1"
 	"k8s.io/klog/v2"
@@ -134,6 +135,17 @@ type CloudConfig struct {
 	LBDeployment LoadBalancerDeployment `gcfg:"load-balancer-deployment"`
 	// [provider] section
 	Prov Provider `gcfg:"provider"`
+	//[ServiceOverride "1"]
+	// Service = iam
+	// URL = https://iam.test.cloud.ibm.com
+	//
+	//[ServiceOverride "2"]
+	// Service = vpc
+	// URL = https://custom.vpc.test.cloud.ibm.com
+	ServiceOverride map[string]*struct {
+		Service string
+		URL     string
+	}
 }
 
 // Cloud is the ibm cloud provider implementation.
@@ -238,6 +250,10 @@ func NewCloud(config io.Reader) (cloudprovider.Interface, error) {
 		return nil, err
 	}
 
+	if err = cloudConfig.validateOverrides(); err != nil {
+		return nil, fmt.Errorf("unable to validate custom endpoint overrides: %v", err)
+	}
+
 	// Get the k8s config.
 	// Use in cluster config if no config file paths were provided.
 	if 0 == len(cloudConfig.Kubernetes.ConfigFilePaths) {
@@ -279,4 +295,29 @@ func init() {
 		klog.Infof("RegisterCloudProvider(%v, %v, %v)", ProviderName, config, os.Args)
 		return NewCloud(config)
 	})
+}
+
+func (cfg *CloudConfig) validateOverrides() error {
+	if len(cfg.ServiceOverride) == 0 {
+		return nil
+	}
+	set := make(map[string]bool)
+	for onum, ovrd := range cfg.ServiceOverride {
+		// Note: gcfg does not space trim, so we have to when comparing to empty string ""
+		name := strings.TrimSpace(ovrd.Service)
+		if name == "" {
+			return fmt.Errorf("service name is missing [Service is \"\"] in override %s", onum)
+		}
+		// insure the map service name is space trimmed
+		ovrd.Service = name
+		url := strings.TrimSpace(ovrd.URL)
+		if url == "" {
+			return fmt.Errorf("url is missing [URL is \"\"] in override %s", onum)
+		}
+		if set[name] {
+			return fmt.Errorf("duplicate entry found for service override [%s] %s", onum, name)
+		}
+		set[name] = true
+	}
+	return nil
 }
