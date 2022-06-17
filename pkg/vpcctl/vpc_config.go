@@ -56,6 +56,11 @@ const (
 	VpcProviderTypeFake = "fake"
 	// VpcProviderTypeGen2 - IKS provider type for VPC Gen2
 	VpcProviderTypeGen2 = "g2"
+
+	// key name used to identify iam service url from service override map
+	iamEndpointName = "iam"
+	// key name used to identify vpc service url from service override map
+	vpcEndpointName = "vpc"
 )
 
 var memberNodeLabelsAllowed = [...]string{
@@ -107,7 +112,7 @@ type ConfigVpc struct {
 
 // getIamEndpoint - retrieve the correct IAM endpoint for the current config
 func (c *ConfigVpc) getIamEndpoint() string {
-	if exist, iamEndpoint := c.getServiceOverrideEndpoint("iam"); exist {
+	if exist, iamEndpoint := c.getServiceOverrideEndpoint(iamEndpointName); exist {
 		return iamEndpoint
 	}
 	if strings.Contains(c.Region, "stage") {
@@ -124,7 +129,7 @@ func (c *ConfigVpc) getIamEndpoint() string {
 
 // getVpcEndpoint - retrieve the correct VPC endpoint for the current config
 func (c *ConfigVpc) getVpcEndpoint() string {
-	if exist, vpcEndpoint := c.getServiceOverrideEndpoint("vpc"); exist {
+	if exist, vpcEndpoint := c.getServiceOverrideEndpoint(vpcEndpointName); exist {
 		return vpcEndpoint
 	}
 	endpoint := vpcEndpointIaaSProdURL

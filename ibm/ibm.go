@@ -39,7 +39,10 @@ import (
 )
 
 const (
-	ProviderName = "ibm"
+	ProviderName      = "ibm"
+	powerEndpointName = "pe"
+	iamEndpointName   = "iam"
+	vpcEndpointName   = "vpc"
 )
 
 // LoadBalancerDeployment is the load balancer deployment data for classic
@@ -111,6 +114,11 @@ type Provider struct {
 	PowerVSZone string `gcfg:"powerVSZone"`
 }
 
+type ServiceEndpointMap map[string]*struct {
+	Service string
+	URL     string
+}
+
 // CloudConfig is the ibm cloud provider config data.
 type CloudConfig struct {
 	// [global] section
@@ -142,10 +150,7 @@ type CloudConfig struct {
 	//[ServiceOverride "2"]
 	// Service = vpc
 	// URL = https://custom.vpc.test.cloud.ibm.com
-	ServiceOverride map[string]*struct {
-		Service string
-		URL     string
-	}
+	ServiceOverride ServiceEndpointMap
 }
 
 // Cloud is the ibm cloud provider implementation.
@@ -272,7 +277,7 @@ func NewCloud(config io.Reader) (cloudprovider.Interface, error) {
 
 	// Create the metadataservice
 	if cloudConfig.Prov.AccountID != "" {
-		cloudMetadata = NewMetadataService(&cloudConfig.Prov, k8sClient)
+		cloudMetadata = NewMetadataService(cloudConfig, k8sClient)
 	} else {
 		cloudMetadata = nil
 	}

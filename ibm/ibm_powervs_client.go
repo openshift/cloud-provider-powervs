@@ -53,7 +53,7 @@ type powerVSClient struct {
 }
 
 // newPowerVSSdkClient initializes a new sdk client and can be overridden by testing
-var newPowerVSSdkClient = func(provider Provider) (Client, error) {
+var newPowerVSSdkClient = func(provider Provider, endpointMap ServiceEndpointMap) (Client, error) {
 	credential, err := readCredential(provider)
 	if err != nil {
 		klog.Errorf("Failed to read the credentials, Error: %v", err)
@@ -65,12 +65,22 @@ var newPowerVSSdkClient = func(provider Provider) (Client, error) {
 		ApiKey: credential,
 	}
 
+	iamEndpoint := getEndpoint(iamEndpointName, endpointMap)
+	if iamEndpoint != "" {
+		authenticator.URL = iamEndpoint
+	}
+
 	// Create the session options struct
 	options := &ibmpisession.IBMPIOptions{
 		Authenticator: authenticator,
 		UserAccount:   provider.AccountID,
 		Region:        provider.PowerVSRegion,
 		Zone:          provider.PowerVSZone,
+	}
+
+	powerEndpoint := getEndpoint(powerEndpointName, endpointMap)
+	if powerEndpoint != "" {
+		options.URL = powerEndpoint
 	}
 
 	// Construct the session service instance
@@ -87,10 +97,22 @@ var newPowerVSSdkClient = func(provider Provider) (Client, error) {
 	return client, nil
 }
 
+func getEndpoint(serviceName string, endpoints ServiceEndpointMap) string {
+	if len(endpoints) == 0 {
+		return ""
+	}
+	for _, service := range endpoints {
+		if strings.TrimSpace(service.Service) == serviceName {
+			return service.URL
+		}
+	}
+	return ""
+}
+
 // newPowerVSClient initializes a new validated powerVSClient
-func newPowerVSClient(provider Provider) (*ibmPowerVSClient, error) {
+func newPowerVSClient(provider Provider, serviceOverride ServiceEndpointMap) (*ibmPowerVSClient, error) {
 	// create Power VS sdk client
-	sdk, err := newPowerVSSdkClient(provider)
+	sdk, err := newPowerVSSdkClient(provider, serviceOverride)
 	if err != nil {
 		klog.Errorf("Failed to create newPowerVSSdkClient, Error: %v", err)
 		return nil, err
