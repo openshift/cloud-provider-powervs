@@ -89,6 +89,7 @@ func (c *Cloud) NewConfigVpc(enablePrivateEndpoint bool) (*vpcctl.ConfigVpc, err
 		SubnetNames:       c.Config.Prov.G2VpcSubnetNames,
 		WorkerAccountID:   c.Config.Prov.G2WorkerServiceAccountID,
 		VpcName:           c.Config.Prov.G2VpcName,
+		ServiceOverride:   c.Config.ServiceOverride,
 	}
 	// If the G2Credentials is set, then look up the API key
 	if c.Config.Prov.G2Credentials != "" {

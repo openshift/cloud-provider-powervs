@@ -69,6 +69,19 @@ func TestConfigVpc_getIamEndpoint(t *testing.T) {
 	config.EnablePrivate = true
 	url = config.getIamEndpoint()
 	assert.Equal(t, url, iamStagePrivateTokenExchangeURL)
+
+	// Check iam endpoint with service override
+	config.ServiceOverride = map[string]*struct {
+		Service string
+		URL     string
+	}{
+		"ServiceOverride 1": {
+			"iam",
+			"https://custom.iam.test.cloud.ibm.com",
+		},
+	}
+	url = config.getIamEndpoint()
+	assert.Equal(t, url, "https://custom.iam.test.cloud.ibm.com")
 }
 
 func TestConfigVpc_getVpcEndpoint(t *testing.T) {
@@ -94,6 +107,58 @@ func TestConfigVpc_getVpcEndpoint(t *testing.T) {
 	config.EnablePrivate = true
 	url = config.getVpcEndpoint()
 	assert.Equal(t, url, "https://us-south-stage01.private.iaasdev.cloud.ibm.com")
+
+	// Check VPC endpoint with service override
+	config.ServiceOverride = map[string]*struct {
+		Service string
+		URL     string
+	}{
+		"ServiceOverride 2": {
+			"vpc",
+			"https://custom.iaas.test.cloud.ibm.com",
+		},
+	}
+	url = config.getVpcEndpoint()
+	assert.Equal(t, url, "https://custom.iaas.test.cloud.ibm.com")
+}
+
+func TestConfigVpc_getServiceOverrideEndpoint(t *testing.T) {
+	// Check with empty service override
+	config := &ConfigVpc{}
+	exists, _ := config.getServiceOverrideEndpoint("iam")
+	assert.Equal(t, exists, false)
+
+	// Check with empty endpoint name
+	config = &ConfigVpc{
+		ServiceOverride: map[string]*struct {
+			Service string
+			URL     string
+		}{
+			"ServiceOverride 1": {
+				"iam",
+				"https://custom.iam.test.cloud.ibm.com",
+			},
+			"ServiceOverride 2": {
+				"vpc",
+				"https://custom.vpc.test.cloud.ibm.com",
+			},
+		},
+	}
+	exists, _ = config.getServiceOverrideEndpoint("")
+	assert.Equal(t, exists, false)
+
+	// Check with valid endpoint name
+	exists, endpoint := config.getServiceOverrideEndpoint("iam")
+	assert.Equal(t, exists, true)
+	assert.Equal(t, endpoint, "https://custom.iam.test.cloud.ibm.com")
+
+	exists, endpoint = config.getServiceOverrideEndpoint("iam")
+	assert.Equal(t, exists, true)
+	assert.Equal(t, endpoint, "https://custom.iam.test.cloud.ibm.com")
+
+	// Check with invalid endpoint name
+	exists, endpoint = config.getServiceOverrideEndpoint("rc")
+	assert.Equal(t, exists, false)
 }
 
 func TestConfigVpc_initialize(t *testing.T) {
@@ -126,6 +191,25 @@ func TestConfigVpc_initialize(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, config.endpointURL, "https://us-south.iaas.cloud.ibm.com/v1")
 	assert.Equal(t, config.tokenExchangeURL, "https://iam.cloud.ibm.com/identity/token")
+
+	// Check with setting service override
+	config.ServiceOverride = map[string]*struct {
+		Service string
+		URL     string
+	}{
+		"ServiceOverride 1": {
+			"iam",
+			"https://custom.iam.test.cloud.ibm.com",
+		},
+		"ServiceOverride 2": {
+			"vpc",
+			"https://custom.vpc.test.cloud.ibm.com",
+		},
+	}
+	err = config.initialize()
+	assert.Nil(t, err)
+	assert.Equal(t, config.endpointURL, "https://custom.vpc.test.cloud.ibm.com/v1")
+	assert.Equal(t, config.tokenExchangeURL, "https://custom.iam.test.cloud.ibm.com/identity/token")
 }
 
 func TestConfigVpc_validate(t *testing.T) {

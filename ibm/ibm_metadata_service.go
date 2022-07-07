@@ -44,13 +44,14 @@ type NodeMetadata struct {
 
 // MetadataService provides access to provider metadata stored in node labels.
 type MetadataService struct {
-	provider       Provider
-	kubeClient     kubernetes.Interface
-	vpcClient      *vpcClient
-	powerVSClient  *ibmPowerVSClient
-	nodeMap        map[string]NodeMetadata
-	nodeMapMux     sync.Mutex
-	nodeCacheStart time.Time
+	provider        Provider
+	kubeClient      kubernetes.Interface
+	vpcClient       *vpcClient
+	powerVSClient   *ibmPowerVSClient
+	nodeMap         map[string]NodeMetadata
+	nodeMapMux      sync.Mutex
+	nodeCacheStart  time.Time
+	serviceOverride ServiceEndpointMap
 }
 
 const (
@@ -69,10 +70,11 @@ var (
 
 // NewMetadataService creates a service using the specified client to connect to the
 // cluster.  kubernetes.Interface could be a kubernetes/fake ClientSet
-func NewMetadataService(provider *Provider, kubeClient kubernetes.Interface) *MetadataService {
+func NewMetadataService(config *CloudConfig, kubeClient kubernetes.Interface) *MetadataService {
 	ms := MetadataService{}
-	if provider != nil {
-		ms.provider = *provider
+	if config != nil {
+		ms.provider = config.Prov
+		ms.serviceOverride = config.ServiceOverride
 	}
 	ms.kubeClient = kubeClient
 	ms.nodeMap = make(map[string]NodeMetadata)
@@ -161,7 +163,7 @@ func (ms *MetadataService) GetNodeMetadata(name string) (NodeMetadata, error) {
 		if isProviderPowerVS(ms.provider) {
 			klog.Infof("Retrieving information for node=" + name + " from Power VS ")
 			if ms.powerVSClient == nil {
-				ms.powerVSClient, err = newPowerVSClient(ms.provider)
+				ms.powerVSClient, err = newPowerVSClient(ms.provider, ms.serviceOverride)
 				if err != nil {
 					klog.Errorf("Failed to create new PowerVS client Error: %v", err)
 					return node, err
