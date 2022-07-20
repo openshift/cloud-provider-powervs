@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/IBM-Cloud/power-go-client/clients/instance"
@@ -46,7 +45,6 @@ func init() {
 type Client interface {
 	GetInstances() (*models.PVMInstances, error)
 	GetInstanceByName(name string) (*models.PVMInstance, error)
-	GetNetworks() (*models.Networks, error)
 	GetDHCPServers() (models.DHCPServers, error)
 	GetDHCPServerByID(string) (*models.DHCPServerDetail, error)
 }
@@ -63,7 +61,6 @@ type powerVSClient struct {
 	cloudInstanceID string
 	instanceClient  *instance.IBMPIInstanceClient
 	dhcpClient      *instance.IBMPIDhcpClient
-	networkClient   *instance.IBMPINetworkClient
 }
 
 // newPowerVSSdkClient initializes a new sdk client and can be overridden by testing
@@ -100,7 +97,6 @@ var newPowerVSSdkClient = func(provider Provider) (Client, error) {
 	ctx := context.Background()
 	client.instanceClient = instance.NewIBMPIInstanceClient(ctx, session, client.cloudInstanceID)
 	client.dhcpClient = instance.NewIBMPIDhcpClient(ctx, session, client.cloudInstanceID)
-	client.networkClient = instance.NewIBMPINetworkClient(ctx, session, client.cloudInstanceID)
 	return client, nil
 }
 
@@ -148,10 +144,6 @@ func (p *powerVSClient) GetInstances() (*models.PVMInstances, error) {
 	return p.instanceClient.GetAll()
 }
 
-func (p *powerVSClient) GetNetworks() (*models.Networks, error) {
-	return p.networkClient.GetAll()
-}
-
 func (p *powerVSClient) GetDHCPServers() (models.DHCPServers, error) {
 	return p.dhcpClient.GetAll()
 }
@@ -166,10 +158,10 @@ func (p *ibmPowerVSClient) populateNodeMetadata(nodeName string, node *NodeMetad
 	// Try to fetch the nodeMetadata from cache
 	obj, exists, err := dhcpCacheStore.GetByKey(nodeName)
 	if err != nil {
-		klog.Errorf("failed to fetch the DHCP IP address for VM : %s from cache store, error: %v", nodeName, err)
+		klog.Errorf("Node %s failed to fetch the node metadata from cache, error: %v", nodeName, err)
 	}
 	if exists {
-		klog.Infof("found metadata %+v for VM: %s from DHCP cache", obj.(nodeMetadataCache).Metadata, nodeName)
+		klog.Infof("Node %s found metadata %+v from DHCP cache", nodeName, obj.(nodeMetadataCache).Metadata)
 		node = obj.(nodeMetadataCache).Metadata
 		return nil
 	}
@@ -195,17 +187,32 @@ func (p *ibmPowerVSClient) populateNodeMetadata(nodeName string, node *NodeMetad
 	node.FailureDomain = p.provider.PowerVSZone
 	klog.Infof("Node %s failureDomain is %s", nodeName, node.FailureDomain)
 
-	// If either Power VS Network Name or Regular expression is provided try to fetch the IP from dhcp server
-	if p.provider.PowerVSVMNetworkName != "" || p.provider.PowerVSVMNetworkNameByRegex != "" {
-		klog.Infof("PowerVSVMNetworkName is %s PowerVSVMNetworkNameByRegex is %s, Fetching ip from dhcp server", p.provider.PowerVSVMNetworkName, p.provider.PowerVSVMNetworkNameByRegex)
-		// Fetch the Network Name.
-		networkName, err := p.getPowerVSNetworkName()
+	for _, network := range pvsInstance.Networks {
+		if strings.TrimSpace(network.ExternalIP) != "" {
+			node.ExternalIP = strings.TrimSpace(network.ExternalIP)
+		}
+		if strings.TrimSpace(network.IPAddress) != "" {
+			node.InternalIP = strings.TrimSpace(network.IPAddress)
+		}
+	}
+
+	if node.ExternalIP == "" && node.InternalIP == "" {
+		// If node ExternalIP and InternalIP is empty, try to fetch the IP from dhcp server.
+		klog.Infof("Node %s fetching IP from DHCP server", nodeName)
+		// Fetch the Network attached to instance.
+		network, err := getPowerVSNetwork(pvsInstance)
 		if err != nil {
 			klog.Errorf("failed to fetch Power VS Network name error: %v", err)
 			return err
 		}
+		// for DHCP network type will be "dynamic" for other networks type will be "fixed"
+		if network.Type != "dynamic" {
+			errStr := fmt.Errorf("Node %s attached with network %s of type %s expecting Network Type to be dynamic to fetch IP from DHCP server ", nodeName, network.NetworkName, network.Type)
+			klog.Error(errStr.Error())
+			return errStr
+		}
 		// Fetch the DHCP server ID.
-		dhcpServerID, err := p.getDHCPServerID(networkName)
+		dhcpServerID, err := p.getDHCPServerID(network.NetworkName)
 		if err != nil {
 			klog.Errorf("failed to fetch dhcp server id error: %v", err)
 			return err
@@ -215,81 +222,34 @@ func (p *ibmPowerVSClient) populateNodeMetadata(nodeName string, node *NodeMetad
 			klog.Errorf("failed to fetch dhcp server details with id: %s error: %v", dhcpServerID, err)
 			return err
 		}
-		var pvmNetwork *models.PVMInstanceNetwork
-		for _, network := range pvsInstance.Networks {
-			if network.NetworkName == networkName {
-				pvmNetwork = network
-				klog.Infof("Found network with name %s attached to node %s", network.NetworkName, nodeName)
-			}
-		}
-		if pvmNetwork == nil {
-			errStr := fmt.Errorf("not able to find network with name: %s attached to pvm instance: %s", p.provider.PowerVSVMNetworkName, nodeName)
-			klog.Error(errStr)
-			return errStr
-		}
 		for _, lease := range dhcpServerDetails.Leases {
-			if pvmNetwork.MacAddress == *lease.InstanceMacAddress {
+			if network.MacAddress == *lease.InstanceMacAddress {
 				node.InternalIP = *lease.InstanceIP
-				klog.Infof("Found internal ip %s for node %s from dhcp lease", node.InternalIP, nodeName)
+				klog.Infof("Node %s found internal ip %s from dhcp lease", nodeName, node.InternalIP)
 			}
 		}
 		if len(node.InternalIP) == 0 {
-			errStr := fmt.Errorf("not able to find internal ip for pvm instance: %s with attached network name: %s", nodeName, p.provider.PowerVSVMNetworkName)
+			errStr := fmt.Errorf("not able to find internal ip for pvm instance: %s with attached network name: %s", nodeName, network.NetworkName)
 			klog.Error(errStr)
 			return errStr
 		}
-	} else {
-		for _, network := range pvsInstance.Networks {
-			if strings.TrimSpace(network.ExternalIP) != "" {
-				node.ExternalIP = strings.TrimSpace(network.ExternalIP)
-			}
-			if strings.TrimSpace(network.IPAddress) != "" {
-				node.InternalIP = strings.TrimSpace(network.IPAddress)
-			}
-		}
 	}
+
 	// Update the cache with the node metadata
 	err = dhcpCacheStore.Add(nodeMetadataCache{
 		Name:     nodeName,
 		Metadata: node,
 	})
+	if err != nil {
+		klog.Errorf("Nod %s failed to add node metadata to cache, Error %v", err)
+	}
 	klog.Infof("Node %s internal IP is %s", nodeName, node.InternalIP)
 	klog.Infof("Node %s external IP is %s", nodeName, node.ExternalIP)
 	return nil
 }
 
-// getPowerVSNetworkName fetches and returns the Power VS Network ID
-func (p *ibmPowerVSClient) getPowerVSNetworkName() (string, error) {
-	if p.provider.PowerVSVMNetworkName != "" {
-		klog.Infof("Using PowerVSVMNetworkName: %s from config", p.provider.PowerVSVMNetworkName)
-		return p.provider.PowerVSVMNetworkName, nil
-	}
-	var re *regexp.Regexp
-	networks, err := p.sdk.GetNetworks()
-	if err != nil {
-		klog.Errorf("failed to get networks, err: %v", err)
-		return "", err
-	}
-	if re, err = regexp.Compile(p.provider.PowerVSVMNetworkNameByRegex); err != nil {
-		return "", err
-	}
-	for _, network := range networks.Networks {
-		if match := re.Match([]byte(*network.Name)); match {
-			klog.Infof("DHCP network found with Name: %s", *network.Name)
-			// set the NetworkName so that in the next iteration it can be fetched early
-			p.provider.PowerVSVMNetworkName = *network.Name
-			return *network.Name, nil
-		}
-	}
-	return "", fmt.Errorf("there is no network exist matching the regular expression %s", p.provider.PowerVSVMNetworkNameByRegex)
-}
-
 // getDHCPServerID fetches and returns the DHCP server ID.
 func (p *ibmPowerVSClient) getDHCPServerID(networkName string) (string, error) {
-	if p.provider.PowerVSDhcpServerID != "" {
-		klog.Infof("Using PowerVSDhcpServerID: %s from config", p.provider.PowerVSDhcpServerID)
-		return p.provider.PowerVSDhcpServerID, nil
-	}
 	// If the DHCP server ID is not provided try to fetch it.
 	// Get all the DHCP servers.
 	dhcpServer, err := p.sdk.GetDHCPServers()
@@ -301,10 +261,19 @@ func (p *ibmPowerVSClient) getDHCPServerID(networkName string) (string, error) {
 	for _, server := range dhcpServer {
 		if *server.Network.Name == networkName {
 			klog.Infof("Found DHCP server with ID %s for network %s", *server.ID, networkName)
-			// set the DhcpServerID so that in the next iteration it can be fetched early
-			p.provider.PowerVSDhcpServerID = *server.ID
 			return *server.ID, nil
 		}
 	}
 	return "", fmt.Errorf("not able to get DHCP server ID for network %s", networkName)
+}
+
+// getPowerVSNetwork fetches and returns the Power VS Network
+func getPowerVSNetwork(instance *models.PVMInstance) (*models.PVMInstanceNetwork, error) {
+	// currently its assumed that there will be only 1 network attached to instance
+	if len(instance.Networks) != 1 {
+		errStr := fmt.Errorf("expecting only one network to be attached to vm %s but got %d", *instance.ServerName, len(instance.Networks))
+		klog.Error(errStr.Error())
+		return nil, errStr
+	}
+	return instance.Networks[0], nil
 }
