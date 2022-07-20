@@ -108,12 +108,6 @@ type Provider struct {
 	PowerVSRegion string `gcfg:"powerVSRegion"`
 	// PowerVSZone is IBM Power VS service zone
 	PowerVSZone string `gcfg:"powerVSZone"`
-	// PowerVSVMNetworkName is the name of the Network attached to Power VS VM.
-	PowerVSVMNetworkName string `gcfg:"powerVSVMNetworkName"`
-	// PowerVSVMNetworkNameByRegex is the regular expression pattern to match to get a network name.
-	PowerVSVMNetworkNameByRegex string `gcfg:"powerVSVMNetworkNameByRegex"`
-	// PowerVSDhcpServerID is the ID of dhcpService created on Power VS cloud instance
-	PowerVSDhcpServerID string `gcfg:"powerVSDhcpServerID"`
 }
 
 // CloudConfig is the ibm cloud provider config data.
