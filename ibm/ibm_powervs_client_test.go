@@ -20,12 +20,78 @@
 package ibm
 
 import (
+	"fmt"
+	"k8s.io/utils/pointer"
 	"log"
+	"reflect"
 	"testing"
 
 	"github.com/IBM-Cloud/power-go-client/power/models"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestGetPowerVSNetwork(t *testing.T) {
+	instanceName := "test_vm"
+	testCases := []struct {
+		testcase      string
+		pvmInstance   *models.PVMInstance
+		expectedError error
+	}{
+		{
+			testcase:      "with no network attached to instance",
+			pvmInstance:   &models.PVMInstance{ServerName: pointer.StringPtr(instanceName)},
+			expectedError: fmt.Errorf("expecting only one network to be attached to vm test_vm but got 0"),
+		},
+		{
+			testcase: "with more than 1 network attached to instance",
+			pvmInstance: &models.PVMInstance{
+				ServerName: pointer.StringPtr(instanceName),
+				Networks: []*models.PVMInstanceNetwork{
+					{
+						NetworkName: "test_network",
+					},
+					{
+						NetworkName: "test_network_2",
+					},
+				},
+			},
+			expectedError: fmt.Errorf("expecting only one network to be attached to vm %s but got 2", instanceName),
+		},
+		{
+			testcase: "with one network attached to instance",
+			pvmInstance: &models.PVMInstance{
+				ServerName: pointer.StringPtr(instanceName),
+				Networks: []*models.PVMInstanceNetwork{
+					{
+						Type:        "dynamic",
+						NetworkName: "test_network",
+						MacAddress:  "ff:11:33:dd:00:22",
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.testcase, func(t *testing.T) {
+			network, err := getPowerVSNetwork(tc.pvmInstance)
+			if tc.expectedError != nil {
+				if err == nil {
+					t.Fatal("Expecting error but got nil")
+				}
+				if !reflect.DeepEqual(tc.expectedError.Error(), err.Error()) {
+					t.Errorf("expected %v, got: %v", tc.expectedError.Error(), err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("Unexpected error %v", err)
+				}
+				assert.Equal(t, "test_network", network.NetworkName, "Unexpected NetworkName")
+				assert.Equal(t, "dynamic", network.Type, "Unexpected Network Type")
+				assert.Equal(t, "ff:11:33:dd:00:22", network.MacAddress, "Unexpected MacAddress")
+			}
+		})
+	}
+}
 
 func TestPopulatePowerVSNodeMetadata(t *testing.T) {
 	powerVSClient := ibmPowerVSClient{
@@ -73,4 +139,12 @@ func (p *powerVSTestClient) GetInstances() (*models.PVMInstances, error) {
 			SysType:       "s922",
 		},
 	}}, nil
+}
+
+func (p *powerVSTestClient) GetDHCPServers() (models.DHCPServers, error) {
+	return nil, nil
+}
+
+func (p *powerVSTestClient) GetDHCPServerByID(string) (*models.DHCPServerDetail, error) {
+	return nil, nil
 }
