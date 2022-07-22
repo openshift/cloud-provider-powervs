@@ -32,6 +32,7 @@ import (
 	"github.com/IBM/go-sdk-core/v5/core"
 	rc "github.com/IBM/platform-services-go-sdk/resourcecontrollerv2"
 
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
 )
@@ -45,6 +46,13 @@ const (
 	// ibmcloud catalog service power-iaas
 	powerVSResourcePlanID = "f165dd34-3a40-423b-9d95-e90a23f724dd"
 )
+
+// dhcpCacheStore is a cache store to hold the Power VS VM DHCP IP.
+var dhcpCacheStore cache.Store
+
+func init() {
+	dhcpCacheStore = initialiseDHCPCacheStore()
+}
 
 // Client is a wrapper object for actual PowerVS SDK clients to allow for easier testing.
 type Client interface {
@@ -240,12 +248,24 @@ func (p *powerVSClient) GetCloudServiceInstanceByName(name string) (*rc.Resource
 
 // populateNodeMetadata forms the node metadata from instance details
 func (p *ibmPowerVSClient) populateNodeMetadata(nodeName string, node *NodeMetadata) error {
-	// Get Power VS Instance
+
+	// Try to fetch the nodeMetadata from cache
+	obj, exists, err := dhcpCacheStore.GetByKey(nodeName)
+	if err != nil {
+		klog.Errorf("Node %s failed to fetch the node metadata from cache, error: %v", nodeName, err)
+	}
+	if exists {
+		klog.Infof("Node %s found metadata %+v from DHCP cache", nodeName, obj.(nodeMetadataCache).Metadata)
+		node = obj.(nodeMetadataCache).Metadata
+		return nil
+	}
+
+	// Get Power VS Instance.
 	pvsInstance, err := p.sdk.GetInstanceByName(nodeName)
 	if err != nil {
 		return err
 	}
-	// Check if instance is not nil
+	// Check if instance is not nil.
 	if pvsInstance == nil {
 		return errors.New("Could not retrieve a Power instance: name=" + nodeName)
 	}
@@ -271,6 +291,54 @@ func (p *ibmPowerVSClient) populateNodeMetadata(nodeName string, node *NodeMetad
 		if strings.TrimSpace(network.IPAddress) != "" {
 			node.InternalIP = strings.TrimSpace(network.IPAddress)
 		}
+	}
+
+	if node.ExternalIP == "" && node.InternalIP == "" {
+		// If node ExternalIP and InternalIP is empty, try to fetch the IP from dhcp server.
+		klog.Infof("Node %s fetching IP from DHCP server", nodeName)
+		// Fetch the Network attached to instance.
+		network, err := getPowerVSNetwork(pvsInstance)
+		if err != nil {
+			klog.Errorf("failed to fetch Power VS Network name error: %v", err)
+			return err
+		}
+		// for DHCP network type will be "dynamic" for other networks type will be "fixed"
+		if network.Type != "dynamic" {
+			errStr := fmt.Errorf("Node %s attached with network %s of type %s expecting Network Type to be dynamic to fetch IP from DHCP server ", nodeName, network.NetworkName, network.Type)
+			klog.Error(errStr.Error())
+			return errStr
+		}
+		// Fetch the DHCP server ID.
+		dhcpServerID, err := p.getDHCPServerID(network.NetworkName)
+		if err != nil {
+			klog.Errorf("failed to fetch dhcp server id error: %v", err)
+			return err
+		}
+		dhcpServerDetails, err := p.sdk.GetDHCPServerByID(dhcpServerID)
+		if err != nil {
+			klog.Errorf("failed to fetch dhcp server details with id: %s error: %v", dhcpServerID, err)
+			return err
+		}
+		for _, lease := range dhcpServerDetails.Leases {
+			if network.MacAddress == *lease.InstanceMacAddress {
+				node.InternalIP = *lease.InstanceIP
+				klog.Infof("Node %s found internal ip %s from dhcp lease", nodeName, node.InternalIP)
+			}
+		}
+		if len(node.InternalIP) == 0 {
+			errStr := fmt.Errorf("not able to find internal ip for pvm instance: %s with attached network name: %s", nodeName, network.NetworkName)
+			klog.Error(errStr)
+			return errStr
+		}
+	}
+
+	// Update the cache with the node metadata
+	err = dhcpCacheStore.Add(nodeMetadataCache{
+		Name:     nodeName,
+		Metadata: node,
+	})
+	if err != nil {
+		klog.Errorf("Node %s failed to add node metadata to cache, Error %v", nodeName, err)
 	}
 	klog.Infof("Node %s internal IP is %s", nodeName, node.InternalIP)
 	klog.Infof("Node %s external IP is %s", nodeName, node.ExternalIP)
