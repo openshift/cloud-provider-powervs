@@ -3,12 +3,13 @@ module cloud.ibm.com/cloud-provider-ibm
 go 1.18
 
 require (
-	github.com/IBM-Cloud/power-go-client v1.1.9
+	github.com/IBM-Cloud/power-go-client v1.1.11
 	github.com/IBM/go-sdk-core/v5 v5.10.1
-	github.com/IBM/platform-services-go-sdk v0.25.1
-	github.com/IBM/vpc-go-sdk v0.19.0
-	github.com/go-openapi/strfmt v0.21.2
-	github.com/spf13/cobra v1.4.0
+	github.com/IBM/platform-services-go-sdk v0.28.1
+	github.com/IBM/vpc-go-sdk v0.22.0
+	github.com/fsnotify/fsnotify v1.5.4
+	github.com/go-openapi/strfmt v0.21.3
+	github.com/spf13/cobra v1.5.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.0
 	gopkg.in/gcfg.v1 v1.2.3
@@ -82,7 +83,7 @@ require (
 	go.etcd.io/etcd/api/v3 v3.5.1 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.1 // indirect
 	go.etcd.io/etcd/client/v3 v3.5.1 // indirect
-	go.mongodb.org/mongo-driver v1.8.3 // indirect
+	go.mongodb.org/mongo-driver v1.10.0 // indirect
 	go.opentelemetry.io/contrib v0.20.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.20.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.20.0 // indirect
@@ -97,11 +98,11 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.19.0 // indirect
-	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
+	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d // indirect
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20220330033206-e17cdc41300f // indirect
+	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
