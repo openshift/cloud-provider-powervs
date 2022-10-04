@@ -1,0 +1,10 @@
+reviewers:
+- mkumatag
+- Karthik-K-N
+approvers:
+- mkumatag
+- Karthik-K-N
+- JoelSpeed
+
+component: "Cloud Compute"
+subcomponent: "Cloud Controller Manager"
