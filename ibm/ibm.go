@@ -102,12 +102,6 @@ type Provider struct {
 	// List of VPC subnet names. Required when configured to get node
 	// data from VPC.
 	G2VpcSubnetNames string `gcfg:"g2VpcSubnetNames"`
-	// PowerVSCloudInstanceID is IBM Power VS service instance id
-	PowerVSCloudInstanceID string `gcfg:"powerVSCloudInstanceID"`
-	// PowerVSRegion is IBM Power VS service region
-	PowerVSRegion string `gcfg:"powerVSRegion"`
-	// PowerVSZone is IBM Power VS service zone
-	PowerVSZone string `gcfg:"powerVSZone"`
 }
 
 // CloudConfig is the ibm cloud provider config data.
@@ -181,6 +175,13 @@ func (c *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 
 	if c.isProviderVpc() {
 		vpcctl.SetInformers(informerFactory)
+		// Configure watch on the cloud credential if it was listed in the config
+		if c.Config.Prov.G2Credentials != "" {
+			err := c.WatchCloudCredential()
+			if err != nil {
+				klog.Errorf("Failed to set up watch on the cloud credential: %v", err)
+			}
+		}
 	}
 }
 
