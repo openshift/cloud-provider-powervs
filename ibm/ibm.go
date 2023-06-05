@@ -1,6 +1,6 @@
 /*******************************************************************************
 * IBM Cloud Kubernetes Service, 5737-D43
-* (C) Copyright IBM Corp. 2017, 2022 All Rights Reserved.
+* (C) Copyright IBM Corp. 2017, 2023 All Rights Reserved.
 *
 * SPDX-License-Identifier: Apache2.0
 *
@@ -102,12 +102,6 @@ type Provider struct {
 	// List of VPC subnet names. Required when configured to get node
 	// data from VPC.
 	G2VpcSubnetNames string `gcfg:"g2VpcSubnetNames"`
-	// PowerVSCloudInstanceID is IBM Power VS service instance id
-	PowerVSCloudInstanceID string `gcfg:"powerVSCloudInstanceID"`
-	// PowerVSRegion is IBM Power VS service region
-	PowerVSRegion string `gcfg:"powerVSRegion"`
-	// PowerVSZone is IBM Power VS service zone
-	PowerVSZone string `gcfg:"powerVSZone"`
 }
 
 // CloudConfig is the ibm cloud provider config data.
@@ -278,6 +272,15 @@ func NewCloud(config io.Reader) (cloudprovider.Interface, error) {
 		Metadata:   cloudMetadata,
 	}
 
+	// Attempt to initialize the VPC logic (if configured)
+	if c.isProviderVpc() {
+		klog.Infof("Initialize VPC with cloud config: %+v", cloudConfig.Prov)
+		_, err := c.InitCloudVpc(shouldPrivateEndpointBeEnabled())
+		if err != nil {
+			errString := fmt.Sprintf("Failed initializing VPC: %v", err)
+			klog.Warningf(errString)
+		}
+	}
 	return &c, nil
 }
 
