@@ -1,6 +1,6 @@
 /*******************************************************************************
 * IBM Cloud Kubernetes Service, 5737-D43
-* (C) Copyright IBM Corp. 2017, 2022 All Rights Reserved.
+* (C) Copyright IBM Corp. 2017, 2023 All Rights Reserved.
 *
 * SPDX-License-Identifier: Apache2.0
 *
@@ -1178,7 +1178,7 @@ spec:
         - ` + fmt.Sprint(port.Port)
 	}
 
-	caliCmd := execCommand("calicoctl", "apply", "--config", calicoCfgFileName, "-f", "-")
+	caliCmd := execCommand("calicoctl", "--allow-version-mismatch", "apply", "--config", calicoCfgFileName, "-f", "-")
 	stdin, err := caliCmd.StdinPipe()
 	if err != nil {
 		klog.Error("Unable to open calico stdin pipe")
@@ -1207,7 +1207,7 @@ func (c *Cloud) deleteCalicoIngressPolicy(service *v1.Service) error {
 	}
 
 	policyName := "allow-lb-" + GetCloudProviderLoadBalancerName(service)
-	caliCmd := execCommand("calicoctl", "delete", "--skip-not-exists", "globalNetworkPolicy", policyName, "--config", calicoCfgFileName)
+	caliCmd := execCommand("calicoctl", "--allow-version-mismatch", "delete", "--skip-not-exists", "globalNetworkPolicy", policyName, "--config", calicoCfgFileName)
 	// 'err': contains the error information about the cmd. For example the status code.
 	// 'stdoutStderr': holds the details such as the actual error message that is returned
 	stdoutStderr, err := caliCmd.CombinedOutput()
@@ -2074,6 +2074,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 			)
 		}
 		klog.Infof("Waiting for update to deployment replicaset %v for load balancer %v ...", lbReplicaSetNamespacedName, lbLogName)
+		// nolint:staticcheck // Method was deprecated in v0.27.0-beta.0 however the method to change to does not exist
 		err = wait.Poll(waitInterval, waitTimeout, replicaSetHasDesiredReplicas(c.KubeClient, lbReplicaSet))
 		if nil != err {
 			return c.Recorder.LoadBalancerWarningEvent(
@@ -2349,15 +2350,13 @@ func (c *Cloud) isServiceConfigurationSupported(service *v1.Service) error {
 			return fmt.Errorf("%s protocol", port.Protocol)
 		}
 
-		if port.AppProtocol != nil {
-			return fmt.Errorf("application protocol")
-		}
 	}
 	return nil
 }
 
 // NOTE(rtheis): This function is based on a similar function in kubernetes.
 func waitForObservedDeployment(getDeploymentFunc func() (*apps.Deployment, error), desiredGeneration int64, interval, timeout time.Duration) error {
+	// nolint:staticcheck // Method was deprecated in v0.27.0-beta.0 however the method to change to does not exist
 	return wait.PollImmediate(interval, timeout, func() (bool, error) {
 		deployment, err := getDeploymentFunc()
 		if err != nil {
