@@ -1,6 +1,6 @@
 /*******************************************************************************
 * IBM Cloud Kubernetes Service, 5737-D43
-* (C) Copyright IBM Corp. 2019, 2022 All Rights Reserved.
+* (C) Copyright IBM Corp. 2019, 2023 All Rights Reserved.
 *
 * SPDX-License-Identifier: Apache2.0
 *
@@ -18,8 +18,8 @@
 *******************************************************************************/
 
 // References:
-// - https://raw.githubusercontent.com/kubernetes/kubernetes/v1.25.2/staging/src/k8s.io/cloud-provider/app/controllermanager.go
-// - https://raw.githubusercontent.com/kubernetes/kubernetes/v1.25.2/staging/src/k8s.io/cloud-provider/sample/basic_main.go
+// - https://raw.githubusercontent.com/kubernetes/kubernetes/v1.27.2/staging/src/k8s.io/cloud-provider/app/controllermanager.go
+// - https://raw.githubusercontent.com/kubernetes/kubernetes/v1.27.2/staging/src/k8s.io/cloud-provider/sample/basic_main.go
 
 package main
 
@@ -73,7 +73,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 			ibm.PrintVersionAndExitIfRequested()
 			cliflag.PrintFlags(cmd.Flags())
 
-			c, err := s.Config(app.ControllerNames(initFuncConstructor), app.ControllersDisabledByDefault.List())
+			c, err := s.Config(app.ControllerNames(initFuncConstructor), app.ControllersDisabledByDefault.List(), app.AllWebhooks, app.DisabledByDefaultWebhooks)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return err
@@ -83,7 +83,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 			cloud := cloudInitializer(completedConfig)
 			controllerInitializers := app.ConstructControllerInitializers(initFuncConstructor, completedConfig, cloud)
 
-			if err := app.Run(completedConfig, cloud, controllerInitializers, stopCh); err != nil {
+			if err := app.Run(completedConfig, cloud, controllerInitializers, nil, stopCh); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				return err
 			}
@@ -100,7 +100,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 	}
 
 	fs := cmd.Flags()
-	namedFlagSets := s.Flags(app.ControllerNames(initFuncConstructor), app.ControllersDisabledByDefault.List())
+	namedFlagSets := s.Flags(app.ControllerNames(initFuncConstructor), app.ControllersDisabledByDefault.List(), app.AllWebhooks, app.DisabledByDefaultWebhooks)
 	ibm.AddVersionFlag(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
 
