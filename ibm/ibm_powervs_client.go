@@ -175,6 +175,9 @@ func (p *ibmPowerVSClient) populateNodeMetadata(nodeName string, node *NodeMetad
 	if pvsInstance == nil {
 		return errors.New("Could not retrieve a Power instance: name=" + nodeName)
 	}
+	if pvsInstance.PvmInstanceID == nil || *pvsInstance.PvmInstanceID == "" {
+		return fmt.Errorf("could not retrieve valid instance id for Power instance name: %s instance id: %v", nodeName, pvsInstance.PvmInstanceID)
+	}
 	node.WorkerID = *pvsInstance.PvmInstanceID
 	klog.Infof("Node %s worker id is %s", nodeName, node.WorkerID)
 
