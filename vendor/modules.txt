@@ -54,6 +54,7 @@ github.com/IBM/go-sdk-core/v5/core
 # github.com/IBM/platform-services-go-sdk v0.39.0
 ## explicit; go 1.18
 github.com/IBM/platform-services-go-sdk/common
+github.com/IBM/platform-services-go-sdk/resourcecontrollerv2
 github.com/IBM/platform-services-go-sdk/resourcemanagerv2
 # github.com/IBM/vpc-go-sdk v0.38.0
 ## explicit; go 1.18

@@ -21,13 +21,15 @@ package ibm
 
 import (
 	"fmt"
-	"k8s.io/utils/pointer"
 	"log"
 	"reflect"
 	"testing"
 
 	"github.com/IBM-Cloud/power-go-client/power/models"
+	rc "github.com/IBM/platform-services-go-sdk/resourcecontrollerv2"
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/utils/pointer"
 )
 
 func TestGetPowerVSNetwork(t *testing.T) {
@@ -146,5 +148,9 @@ func (p *powerVSTestClient) GetDHCPServers() (models.DHCPServers, error) {
 }
 
 func (p *powerVSTestClient) GetDHCPServerByID(string) (*models.DHCPServerDetail, error) {
+	return nil, nil
+}
+
+func (p *powerVSTestClient) GetCloudServiceInstanceByName(string) (*rc.ResourceInstance, error) {
 	return nil, nil
 }

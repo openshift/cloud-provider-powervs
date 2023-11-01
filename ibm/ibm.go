@@ -104,6 +104,8 @@ type Provider struct {
 	G2VpcSubnetNames string `gcfg:"g2VpcSubnetNames"`
 	// PowerVSCloudInstanceID is IBM Power VS service instance id
 	PowerVSCloudInstanceID string `gcfg:"powerVSCloudInstanceID"`
+	// PowerVSCloudInstanceName is IBM Power VS service instance name
+	PowerVSCloudInstanceName string `gcfg:"powerVSCloudInstanceName"`
 	// PowerVSRegion is IBM Power VS service region
 	PowerVSRegion string `gcfg:"powerVSRegion"`
 	// PowerVSZone is IBM Power VS service zone
