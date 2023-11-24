@@ -1,6 +1,6 @@
 /*******************************************************************************
 * IBM Cloud Kubernetes Service, 5737-D43
-* (C) Copyright IBM Corp. 2017, 2022 All Rights Reserved.
+* (C) Copyright IBM Corp. 2017, 2022, 2023 All Rights Reserved.
 *
 * SPDX-License-Identifier: Apache2.0
 *
@@ -120,7 +120,7 @@ func (c *Cloud) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, erro
 // for a given node. In cases where node.spec.providerID is empty, implementations can use other
 // properties of the node like its name, labels and annotations.
 func (c *Cloud) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
-	nodeMD, err := c.Metadata.GetNodeMetadata(node.Name)
+	nodeMD, err := c.Metadata.GetNodeMetadata(node.Name, c.Config.Kubernetes.SetNetworkUnavailable)
 	if err != nil {
 		return nil, err
 	}
@@ -146,11 +146,6 @@ func (c *Cloud) providerIDV2(ctx context.Context, nodeMD NodeMetadata) string {
 		return nodeMD.ProviderID
 	}
 	// construct provider id from config and node metadata
-	// ProviderID format for Power VS
-	// ProviderID = ibmpowervs://<powervs_region>/<powervs_zone>/<powervs_service_instanceid>/powervs_vm_instanceid
-	if isProviderPowerVS(c.Config.Prov) {
-		return fmt.Sprintf("ibmpowervs://%s/%s/%s/%s", c.Config.Prov.PowerVSRegion, c.Config.Prov.PowerVSZone, c.Metadata.provider.PowerVSCloudInstanceID, nodeMD.WorkerID)
-	}
 	return fmt.Sprintf("ibm://%s///%s/%s", c.Config.Prov.AccountID, c.Config.Prov.ClusterID, nodeMD.WorkerID)
 }
 

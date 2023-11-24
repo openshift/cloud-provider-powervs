@@ -1,6 +1,6 @@
 /*******************************************************************************
 * IBM Cloud Kubernetes Service, 5737-D43
-* (C) Copyright IBM Corp. 2019, 2022 All Rights Reserved.
+* (C) Copyright IBM Corp. 2019, 2022, 2023 All Rights Reserved.
 *
 * SPDX-License-Identifier: Apache2.0
 *
@@ -25,8 +25,14 @@ import (
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	clientretry "k8s.io/client-go/util/retry"
+	cloudproviderapi "k8s.io/cloud-provider/api"
+	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
 )
 
@@ -47,7 +53,6 @@ type MetadataService struct {
 	provider       Provider
 	kubeClient     kubernetes.Interface
 	vpcClient      *vpcClient
-	powerVSClient  *ibmPowerVSClient
 	nodeMap        map[string]NodeMetadata
 	nodeMapMux     sync.Mutex
 	nodeCacheStart time.Time
@@ -110,7 +115,7 @@ func (ms *MetadataService) putCachedNode(name string, node NodeMetadata) {
 
 // GetNodeMetadata returns the metadata for the named node.  If the node does
 // not exist, or not all data is available, an error is returned.
-func (ms *MetadataService) GetNodeMetadata(name string) (NodeMetadata, error) {
+func (ms *MetadataService) GetNodeMetadata(name string, applyNetworkUnavailable bool) (NodeMetadata, error) {
 	node, ok := ms.getCachedNode(name)
 	if ok {
 		return node, nil
@@ -118,6 +123,43 @@ func (ms *MetadataService) GetNodeMetadata(name string) (NodeMetadata, error) {
 	k8sNode, err := ms.kubeClient.CoreV1().Nodes().Get(context.TODO(), string(name), metav1.GetOptions{})
 	if nil != err {
 		return node, err
+	}
+	if applyNetworkUnavailable {
+		// Check if the node has the external cloud provider taint (which means we are initializing a node)
+		cloudTaintFound := false
+		for _, taint := range k8sNode.Spec.Taints {
+			if taint.Key == cloudproviderapi.TaintExternalCloudProvider {
+				cloudTaintFound = true
+				break
+			}
+		}
+		// Check if the node has the NetworkUnavailable condition
+		_, networkUnavailableCondition := nodeutil.GetNodeCondition(&k8sNode.Status, v1.NodeNetworkUnavailable)
+		// If it has the taint, but not the condition, add the condition
+		if cloudTaintFound && networkUnavailableCondition == nil {
+			UpdateNodeSpecBackoff := wait.Backoff{
+				Steps:    20,
+				Duration: 50 * time.Millisecond,
+				Jitter:   1.0,
+			}
+			err = clientretry.RetryOnConflict(UpdateNodeSpecBackoff, func() error {
+				if err := nodeutil.SetNodeCondition(ms.kubeClient, types.NodeName(name), v1.NodeCondition{
+					Type:               v1.NodeNetworkUnavailable,
+					Status:             v1.ConditionTrue,
+					Reason:             "No CNI present",
+					Message:            "There is no active CNI present on the node",
+					LastTransitionTime: metav1.Now(),
+				}); err != nil {
+					return err
+				}
+				return nil
+			})
+			if err != nil {
+				klog.Infof("Falied to apply NetworkUnavailable condition to node %s", name)
+				return node, err
+			}
+			klog.Infof("Successfully applied NetworkUnavailable condition to node %s", name)
+		}
 	}
 	newNode := NodeMetadata{}
 	// When getting labels, it is possible the node labels have not yet been set.
@@ -158,38 +200,21 @@ func (ms *MetadataService) GetNodeMetadata(name string) (NodeMetadata, error) {
 		ms.putCachedNode(name, newNode)
 		return newNode, nil
 	} else if isProviderVpc(ms.provider.ProviderType) {
-		if isProviderPowerVS(ms.provider) {
-			klog.Infof("Retrieving information for node=" + name + " from Power VS ")
-			if ms.powerVSClient == nil {
-				ms.powerVSClient, err = newPowerVSClient(&ms.provider)
-				if err != nil {
-					klog.Errorf("Failed to create new PowerVS client Error: %v", err)
-					return node, err
-				}
-			}
-			// gather node information from Power VS
-			err = ms.powerVSClient.populateNodeMetadata(name, &newNode)
-			if err != nil {
-				klog.Errorf("Failed to populate metadata for PowerVS node %s Error: %v", name, err)
-				return node, err
-			}
-		} else {
-			// labels were not set; if VPC we can try to call api for values
-			klog.Infof("Retrieving information for node=" + name + " from VPC")
+		// labels were not set; if VPC we can try to call api for values
+		klog.Infof("Retrieving information for node=" + name + " from VPC")
 
-			// create vpcClient if we haven't already
-			if ms.vpcClient == nil {
-				ms.vpcClient, err = newVpcClient(ms.provider)
-				if err != nil {
-					return node, err
-				}
-			}
-
-			// gather node information from VPC
-			err = ms.vpcClient.populateNodeMetadata(name, &newNode)
+		// create vpcClient if we haven't already
+		if ms.vpcClient == nil {
+			ms.vpcClient, err = newVpcClient(ms.provider)
 			if err != nil {
 				return node, err
 			}
+		}
+
+		// gather node information from VPC
+		err = ms.vpcClient.populateNodeMetadata(name, &newNode)
+		if err != nil {
+			return node, err
 		}
 
 		ms.putCachedNode(name, newNode)
