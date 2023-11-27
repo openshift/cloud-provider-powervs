@@ -91,6 +91,12 @@ type Event struct {
 	// +optional
 	ImpersonatedUser *authnv1.UserInfo `json:"impersonatedUser,omitempty" protobuf:"bytes,7,opt,name=impersonatedUser"`
 	// Source IPs, from where the request originated and intermediate proxies.
+	// The source IPs are listed from (in order):
+	// 1. X-Forwarded-For request header IPs
+	// 2. X-Real-Ip header, if not present in the X-Forwarded-For list
+	// 3. The remote address for the connection, if it doesn't match the last
+	//    IP in the list up to here (X-Forwarded-For or X-Real-Ip).
+	// Note: All but the last IP can be arbitrarily set by the client.
 	// +optional
 	SourceIPs []string `json:"sourceIPs,omitempty" protobuf:"bytes,8,rep,name=sourceIPs"`
 	// UserAgent records the user agent string reported by the client.
@@ -223,10 +229,10 @@ type PolicyRule struct {
 	Namespaces []string `json:"namespaces,omitempty" protobuf:"bytes,6,rep,name=namespaces"`
 
 	// NonResourceURLs is a set of URL paths that should be audited.
-	// *s are allowed, but only as the full, final step in the path.
+	// `*`s are allowed, but only as the full, final step in the path.
 	// Examples:
-	//  "/metrics" - Log requests for apiserver metrics
-	//  "/healthz*" - Log all health checks
+	// - `/metrics` - Log requests for apiserver metrics
+	// - `/healthz*` - Log all health checks
 	// +optional
 	NonResourceURLs []string `json:"nonResourceURLs,omitempty" protobuf:"bytes,7,rep,name=nonResourceURLs"`
 
@@ -257,11 +263,11 @@ type GroupResources struct {
 	// Resources is a list of resources this rule applies to.
 	//
 	// For example:
-	// 'pods' matches pods.
-	// 'pods/log' matches the log subresource of pods.
-	// '*' matches all resources and their subresources.
-	// 'pods/*' matches all subresources of pods.
-	// '*/scale' matches all scale subresources.
+	// - `pods` matches pods.
+	// - `pods/log` matches the log subresource of pods.
+	// - `*` matches all resources and their subresources.
+	// - `pods/*` matches all subresources of pods.
+	// - `*/scale` matches all scale subresources.
 	//
 	// If wildcard is present, the validation rule will ensure resources do not
 	// overlap with each other.
