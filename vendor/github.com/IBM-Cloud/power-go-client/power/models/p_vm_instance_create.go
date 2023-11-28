@@ -21,6 +21,9 @@ import (
 // swagger:model PVMInstanceCreate
 type PVMInstanceCreate struct {
 
+	// The custom deployment type
+	DeploymentType string `json:"deploymentType,omitempty"`
+
 	// Image ID of the image to use for the server
 	// Required: true
 	ImageID *string `json:"imageID"`
@@ -35,7 +38,7 @@ type PVMInstanceCreate struct {
 	// Required: true
 	Memory *float64 `json:"memory"`
 
-	// Indicates if the server is allowed to migrate between hosts
+	// (deprecated - replaced by pinPolicy) Indicates if the server is allowed to migrate between hosts
 	Migratable *bool `json:"migratable,omitempty"`
 
 	// (deprecated - replaced by networks) List of Network IDs
@@ -73,6 +76,9 @@ type PVMInstanceCreate struct {
 	// Name of the server to create
 	// Required: true
 	ServerName *string `json:"serverName"`
+
+	// The shared processor pool for server deployment
+	SharedProcessorPool string `json:"sharedProcessorPool,omitempty"`
 
 	// The pvm instance Software Licenses
 	SoftwareLicenses *SoftwareLicenses `json:"softwareLicenses,omitempty"`
@@ -508,6 +514,11 @@ func (m *PVMInstanceCreate) contextValidateNetworks(ctx context.Context, formats
 	for i := 0; i < len(m.Networks); i++ {
 
 		if m.Networks[i] != nil {
+
+			if swag.IsZero(m.Networks[i]) { // not required
+				return nil
+			}
+
 			if err := m.Networks[i].ContextValidate(ctx, formats); err != nil {
 				if ve, ok := err.(*errors.Validation); ok {
 					return ve.ValidateName("networks" + "." + strconv.Itoa(i))
@@ -525,6 +536,10 @@ func (m *PVMInstanceCreate) contextValidateNetworks(ctx context.Context, formats
 
 func (m *PVMInstanceCreate) contextValidatePinPolicy(ctx context.Context, formats strfmt.Registry) error {
 
+	if swag.IsZero(m.PinPolicy) { // not required
+		return nil
+	}
+
 	if err := m.PinPolicy.ContextValidate(ctx, formats); err != nil {
 		if ve, ok := err.(*errors.Validation); ok {
 			return ve.ValidateName("pinPolicy")
@@ -540,6 +555,11 @@ func (m *PVMInstanceCreate) contextValidatePinPolicy(ctx context.Context, format
 func (m *PVMInstanceCreate) contextValidateSoftwareLicenses(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.SoftwareLicenses != nil {
+
+		if swag.IsZero(m.SoftwareLicenses) { // not required
+			return nil
+		}
+
 		if err := m.SoftwareLicenses.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("softwareLicenses")
@@ -556,6 +576,11 @@ func (m *PVMInstanceCreate) contextValidateSoftwareLicenses(ctx context.Context,
 func (m *PVMInstanceCreate) contextValidateStorageAffinity(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.StorageAffinity != nil {
+
+		if swag.IsZero(m.StorageAffinity) { // not required
+			return nil
+		}
+
 		if err := m.StorageAffinity.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("storageAffinity")
@@ -572,6 +597,11 @@ func (m *PVMInstanceCreate) contextValidateStorageAffinity(ctx context.Context, 
 func (m *PVMInstanceCreate) contextValidateVirtualCores(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.VirtualCores != nil {
+
+		if swag.IsZero(m.VirtualCores) { // not required
+			return nil
+		}
+
 		if err := m.VirtualCores.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("virtualCores")
