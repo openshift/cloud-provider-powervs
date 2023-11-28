@@ -93,36 +93,45 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		if s.Cert != nil {
 			s.Cert.AddListener(dynamicCertificateController)
 		}
-
+		// generate a context from stopCh. This is to avoid modifying files which are relying on apiserver
+		// TODO: See if we can pass ctx to the current method
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			select {
+			case <-stopCh:
+				cancel() // stopCh closed, so cancel our context
+			case <-ctx.Done():
+			}
+		}()
 		// start controllers if possible
 		if controller, ok := s.ClientCA.(dynamiccertificates.ControllerRunner); ok {
 			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 			// Files are required to be populated already, so this is for convenience.
-			if err := controller.RunOnce(); err != nil {
+			if err := controller.RunOnce(ctx); err != nil {
 				klog.Warningf("Initial population of client CA failed: %v", err)
 			}
 
-			go controller.Run(1, stopCh)
+			go controller.Run(ctx, 1)
 		}
 		if controller, ok := s.Cert.(dynamiccertificates.ControllerRunner); ok {
 			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 			// Files are required to be populated already, so this is for convenience.
-			if err := controller.RunOnce(); err != nil {
+			if err := controller.RunOnce(ctx); err != nil {
 				klog.Warningf("Initial population of default serving certificate failed: %v", err)
 			}
 
-			go controller.Run(1, stopCh)
+			go controller.Run(ctx, 1)
 		}
 		for _, sniCert := range s.SNICerts {
 			sniCert.AddListener(dynamicCertificateController)
 			if controller, ok := sniCert.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 				// Files are required to be populated already, so this is for convenience.
-				if err := controller.RunOnce(); err != nil {
+				if err := controller.RunOnce(ctx); err != nil {
 					klog.Warningf("Initial population of SNI serving certificate failed: %v", err)
 				}
 
-				go controller.Run(1, stopCh)
+				go controller.Run(ctx, 1)
 			}
 		}
 
@@ -180,7 +189,10 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 	if s.HTTP2MaxStreamsPerConnection > 0 {
 		http2Options.MaxConcurrentStreams = uint32(s.HTTP2MaxStreamsPerConnection)
 	} else {
-		http2Options.MaxConcurrentStreams = 250
+		// match http2.initialMaxConcurrentStreams used by clients
+		// this makes it so that a malicious client can only open 400 streams before we forcibly close the connection
+		// https://github.com/golang/net/commit/b225e7ca6dde1ef5a5ae5ce922861bda011cfabd
+		http2Options.MaxConcurrentStreams = 100
 	}
 
 	// increase the connection buffer size from the 1MB default to handle the specified number of concurrent streams
