@@ -69,6 +69,24 @@ type Encoder interface {
 	Identifier() Identifier
 }
 
+// MemoryAllocator is responsible for allocating memory.
+// By encapsulating memory allocation into its own interface, we can reuse the memory
+// across many operations in places we know it can significantly improve the performance.
+type MemoryAllocator interface {
+	// Allocate reserves memory for n bytes.
+	// Note that implementations of this method are not required to zero the returned array.
+	// It is the caller's responsibility to clean the memory if needed.
+	Allocate(n uint64) []byte
+}
+
+// EncoderWithAllocator  serializes objects in a way that allows callers to manage any additional memory allocations.
+type EncoderWithAllocator interface {
+	Encoder
+	// EncodeWithAllocator writes an object to a stream as Encode does.
+	// In addition, it allows for providing a memory allocator for efficient memory usage during object serialization
+	EncodeWithAllocator(obj Object, w io.Writer, memAlloc MemoryAllocator) error
+}
+
 // Decoder attempts to load an object from data.
 type Decoder interface {
 	// Decode attempts to deserialize the provided data using either the innate typing of the scheme or the
@@ -207,6 +225,12 @@ type NestedObjectEncoder interface {
 
 // NestedObjectDecoder is an optional interface that objects may implement to be given
 // an opportunity to decode any nested Objects / RawExtensions during serialization.
+// It is possible for DecodeNestedObjects to return a non-nil error but for the decoding
+// to have succeeded in the case of strict decoding errors (e.g. unknown/duplicate fields).
+// As such it is important for callers of DecodeNestedObjects to check to confirm whether
+// an error is a runtime.StrictDecodingError before short circuiting.
+// Similarly, implementations of DecodeNestedObjects should ensure that a runtime.StrictDecodingError
+// is only returned when the rest of decoding has succeeded.
 type NestedObjectDecoder interface {
 	DecodeNestedObjects(d Decoder) error
 }
@@ -341,4 +365,9 @@ type Unstructured interface {
 	// error should terminate the iteration. If IsList() returns false, this method should return an error
 	// instead of calling the provided function.
 	EachListItem(func(Object) error) error
+	// EachListItemWithAlloc works like EachListItem, but avoids retaining references to a slice of items.
+	// It does this by making a shallow copy of non-pointer items before passing them to fn.
+	//
+	// If the items passed to fn are not retained, or are retained for the same duration, use EachListItem instead for memory efficiency.
+	EachListItemWithAlloc(func(Object) error) error
 }

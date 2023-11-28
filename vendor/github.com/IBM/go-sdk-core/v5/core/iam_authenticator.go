@@ -31,8 +31,7 @@ import (
 // and adds the access token to requests via an Authorization header
 // of the form:
 //
-// 		Authorization: Bearer <access-token>
-//
+//	Authorization: Bearer <access-token>
 type IamAuthenticator struct {
 
 	// The apikey used to fetch the bearer token from the IAM token server.
@@ -75,7 +74,8 @@ type IamAuthenticator struct {
 
 	// [Optional] The http.Client object used to invoke token server requests.
 	// If not specified by the user, a suitable default Client will be constructed.
-	Client *http.Client
+	Client     *http.Client
+	clientInit sync.Once
 
 	// The cached token and expiration time.
 	tokenData *iamTokenData
@@ -167,6 +167,26 @@ func (builder *IamAuthenticatorBuilder) Build() (*IamAuthenticator, error) {
 	return &builder.IamAuthenticator, nil
 }
 
+// client returns the authenticator's http client after potentially initializing it.
+func (authenticator *IamAuthenticator) client() *http.Client {
+	authenticator.clientInit.Do(func() {
+		if authenticator.Client == nil {
+			authenticator.Client = DefaultHTTPClient()
+			authenticator.Client.Timeout = time.Second * 30
+
+			// If the user told us to disable SSL verification, then do it now.
+			if authenticator.DisableSSLVerification {
+				transport := &http.Transport{
+					// #nosec G402
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				}
+				authenticator.Client.Transport = transport
+			}
+		}
+	})
+	return authenticator.Client
+}
+
 // NewIamAuthenticator constructs a new IamAuthenticator instance.
 // Deprecated - use the IamAuthenticatorBuilder instead.
 func NewIamAuthenticator(apiKey string, url string, clientId string, clientSecret string,
@@ -215,8 +235,7 @@ func (*IamAuthenticator) AuthenticationType() string {
 //
 // The IAM bearer token will be added to the request's headers in the form:
 //
-// 		Authorization: Bearer <bearer-token>
-//
+//	Authorization: Bearer <bearer-token>
 func (authenticator *IamAuthenticator) Authenticate(request *http.Request) error {
 	token, err := authenticator.GetToken()
 	if err != nil {
@@ -275,9 +294,24 @@ func (authenticator *IamAuthenticator) setTokenData(tokenData *iamTokenData) {
 // and that the ClientId and ClientSecret properties are mutually inclusive.
 func (this *IamAuthenticator) Validate() error {
 
-	// The user should specify exactly one of ApiKey or RefreshToken.
-	if this.ApiKey == "" && this.RefreshToken == "" ||
-		this.ApiKey != "" && this.RefreshToken != "" {
+	// The user should specify at least one of ApiKey or RefreshToken.
+	// Note: We'll allow both ApiKey and RefreshToken to be specified,
+	// in which case we'd use ApiKey in the RequestToken() method.
+	// Consider this scenario...
+	// - An IamAuthenticator instance is configured with an apikey and is initially
+	//   declared to be "valid" by the Validate() method.
+	// - The authenticator is used to construct a service, then an operation is
+	//   invoked which then triggers the very first call to RequestToken().
+	// - The authenticator invokes the IAM get_token operation and then receives
+	//   the response.  The authenticator copies the refresh_token value from the response
+	//   to the authenticator's RefreshToken field.
+	// - At this point, the authenticator would have non-empty values in both the
+	//   ApiKey and RefreshToken fields.
+	// This all means that we must try to make sure that a previously-validated
+	// instance of the authenticator doesn't become invalidated simply through
+	// normal use.
+	//
+	if this.ApiKey == "" && this.RefreshToken == "" {
 		return fmt.Errorf(ERRORMSG_EXCLUSIVE_PROPS_ERROR, "ApiKey", "RefreshToken")
 	}
 
@@ -286,10 +320,9 @@ func (this *IamAuthenticator) Validate() error {
 	}
 
 	// Validate ClientId and ClientSecret.
-	// If RefreshToken is not specified, then both or neither should be specified.
-	// If RefreshToken is specified, then both must be specified.
-	if this.ClientId == "" && this.ClientSecret == "" && this.RefreshToken == "" {
-		// Do nothing as this is the valid scenario
+	// Either both or neither should be specified.
+	if this.ClientId == "" && this.ClientSecret == "" {
+		// Do nothing as this is the valid scenario.
 	} else {
 		// Since it is NOT the case that both properties are empty, make sure BOTH are specified.
 		if this.ClientId == "" {
@@ -409,22 +442,6 @@ func (authenticator *IamAuthenticator) RequestToken() (*IamTokenServerResponse, 
 		req.SetBasicAuth(authenticator.ClientId, authenticator.ClientSecret)
 	}
 
-	// If the authenticator does not have a Client, create one now.
-	if authenticator.Client == nil {
-		authenticator.Client = &http.Client{
-			Timeout: time.Second * 30,
-		}
-
-		// If the user told us to disable SSL verification, then do it now.
-		if authenticator.DisableSSLVerification {
-			transport := &http.Transport{
-				// #nosec G402
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			}
-			authenticator.Client.Transport = transport
-		}
-	}
-
 	// If debug is enabled, then dump the request.
 	if GetLogger().IsLogLevelEnabled(LevelDebug) {
 		buf, dumpErr := httputil.DumpRequestOut(req, req.Body != nil)
@@ -436,7 +453,7 @@ func (authenticator *IamAuthenticator) RequestToken() (*IamTokenServerResponse, 
 	}
 
 	GetLogger().Debug("Invoking IAM 'get token' operation: %s", builder.URL)
-	resp, err := authenticator.Client.Do(req)
+	resp, err := authenticator.client().Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -473,7 +490,7 @@ func (authenticator *IamAuthenticator) RequestToken() (*IamTokenServerResponse, 
 
 	tokenResponse := &IamTokenServerResponse{}
 	_ = json.NewDecoder(resp.Body).Decode(tokenResponse)
-	defer resp.Body.Close()
+	defer resp.Body.Close() // #nosec G307
 	return tokenResponse, nil
 }
 

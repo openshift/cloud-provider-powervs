@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/IBM/go-sdk-core/v5/core"
+
 	"github.com/IBM-Cloud/power-go-client/errors"
 
 	"github.com/IBM-Cloud/power-go-client/helpers"
@@ -12,26 +14,26 @@ import (
 	"github.com/IBM-Cloud/power-go-client/power/models"
 )
 
-//IBMPIImageClient ...
+// IBMPIImageClient
 type IBMPIImageClient struct {
 	IBMPIClient
 }
 
-// NewIBMPIImageClient ...
+// NewIBMPIImageClient
 func NewIBMPIImageClient(ctx context.Context, sess *ibmpisession.IBMPISession, cloudInstanceID string) *IBMPIImageClient {
 	return &IBMPIImageClient{
 		*NewIBMPIClient(ctx, sess, cloudInstanceID),
 	}
 }
 
-// Get PI Image
+// Get an Image
 func (f *IBMPIImageClient) Get(id string) (*models.Image, error) {
 	params := p_cloud_images.NewPcloudCloudinstancesImagesGetParams().
 		WithContext(f.ctx).WithTimeout(helpers.PIGetTimeOut).
 		WithCloudInstanceID(f.cloudInstanceID).WithImageID(id)
 	resp, err := f.session.Power.PCloudImages.PcloudCloudinstancesImagesGet(params, f.session.AuthInfo(f.cloudInstanceID))
 	if err != nil {
-		return nil, fmt.Errorf(errors.GetImageOperationFailed, id, err)
+		return nil, ibmpisession.SDKFailWithAPIError(err, fmt.Errorf(errors.GetImageOperationFailed, id, err))
 	}
 	if resp == nil || resp.Payload == nil {
 		return nil, fmt.Errorf("failed to perform Get Image Operation for image %s", id)
@@ -39,14 +41,14 @@ func (f *IBMPIImageClient) Get(id string) (*models.Image, error) {
 	return resp.Payload, nil
 }
 
-// GetAll Images that are imported into Power Instance
+// Get All Images that are imported into Power Instance
 func (f *IBMPIImageClient) GetAll() (*models.Images, error) {
 	params := p_cloud_images.NewPcloudCloudinstancesImagesGetallParams().
 		WithContext(f.ctx).WithTimeout(helpers.PIGetTimeOut).
 		WithCloudInstanceID(f.cloudInstanceID)
 	resp, err := f.session.Power.PCloudImages.PcloudCloudinstancesImagesGetall(params, f.session.AuthInfo(f.cloudInstanceID))
 	if err != nil {
-		return nil, fmt.Errorf("failed to Get all PI Images of the PVM instance %s : %w", f.cloudInstanceID, err)
+		return nil, ibmpisession.SDKFailWithAPIError(err, fmt.Errorf("failed to Get all PI Images of the PVM instance %s : %w", f.cloudInstanceID, err))
 	}
 	if resp == nil || resp.Payload == nil {
 		return nil, fmt.Errorf("failed to Get all PI Images of the PVM instance %s", f.cloudInstanceID)
@@ -54,18 +56,17 @@ func (f *IBMPIImageClient) GetAll() (*models.Images, error) {
 	return resp.Payload, nil
 }
 
-// Create the stock image
+// Create a Stock Image
 func (f *IBMPIImageClient) Create(body *models.CreateImage) (*models.Image, error) {
-	if len(*body.Source) == 0 {
-		defaultSource := "root-project"
-		body.Source = &defaultSource
+	if body.Source == nil || len(*body.Source) == 0 {
+		body.Source = core.StringPtr("root-project")
 	}
 	params := p_cloud_images.NewPcloudCloudinstancesImagesPostParams().
 		WithContext(f.ctx).WithTimeout(helpers.PICreateTimeOut).
 		WithCloudInstanceID(f.cloudInstanceID).WithBody(body)
 	respok, respcreated, err := f.session.Power.PCloudImages.PcloudCloudinstancesImagesPost(params, f.session.AuthInfo(f.cloudInstanceID))
 	if err != nil {
-		return nil, fmt.Errorf(errors.CreateImageOperationFailed, f.cloudInstanceID, err)
+		return nil, ibmpisession.SDKFailWithAPIError(err, fmt.Errorf(errors.CreateImageOperationFailed, f.cloudInstanceID, err))
 	}
 	if respok != nil && respok.Payload != nil {
 		return respok.Payload, nil
@@ -76,14 +77,14 @@ func (f *IBMPIImageClient) Create(body *models.CreateImage) (*models.Image, erro
 	return nil, fmt.Errorf("failed to perform Create Image Operation for cloud instance %s", f.cloudInstanceID)
 }
 
-// Import the image
+// Import an Image
 func (f *IBMPIImageClient) CreateCosImage(body *models.CreateCosImageImportJob) (imageJob *models.JobReference, err error) {
 	params := p_cloud_images.NewPcloudV1CloudinstancesCosimagesPostParams().
 		WithContext(f.ctx).WithTimeout(helpers.PICreateTimeOut).
 		WithCloudInstanceID(f.cloudInstanceID).WithBody(body)
 	resp, err := f.session.Power.PCloudImages.PcloudV1CloudinstancesCosimagesPost(params, f.session.AuthInfo(f.cloudInstanceID))
 	if err != nil {
-		return nil, fmt.Errorf("failed to perform Create COS Image Operation for cloud instance %s with error %w", f.cloudInstanceID, err)
+		return nil, ibmpisession.SDKFailWithAPIError(err, fmt.Errorf("failed to perform Create COS Image Operation for cloud instance %s with error %w", f.cloudInstanceID, err))
 	}
 	if resp == nil || resp.Payload == nil {
 		return nil, fmt.Errorf("failed to perform Create COS Image Operation for cloud instance %s", f.cloudInstanceID)
@@ -91,14 +92,14 @@ func (f *IBMPIImageClient) CreateCosImage(body *models.CreateCosImageImportJob) 
 	return resp.Payload, nil
 }
 
-// Export an image
+// Export an Image
 func (f *IBMPIImageClient) ExportImage(id string, body *models.ExportImage) (*models.JobReference, error) {
 	params := p_cloud_images.NewPcloudV2ImagesExportPostParams().
 		WithContext(f.ctx).WithTimeout(helpers.PICreateTimeOut).
 		WithCloudInstanceID(f.cloudInstanceID).WithImageID(id).WithBody(body)
 	resp, err := f.session.Power.PCloudImages.PcloudV2ImagesExportPost(params, f.session.AuthInfo(f.cloudInstanceID))
 	if err != nil {
-		return nil, fmt.Errorf("failed to Export COS Image for image id %s with error %w", id, err)
+		return nil, ibmpisession.SDKFailWithAPIError(err, fmt.Errorf("failed to Export COS Image for image id %s with error %w", id, err))
 	}
 	if resp == nil || resp.Payload == nil {
 		return nil, fmt.Errorf("failed to Export COS Image for image id %s", id)
@@ -106,7 +107,7 @@ func (f *IBMPIImageClient) ExportImage(id string, body *models.ExportImage) (*mo
 	return resp.Payload, nil
 }
 
-// Delete ...
+// Delete an Image
 func (f *IBMPIImageClient) Delete(id string) error {
 	params := p_cloud_images.NewPcloudCloudinstancesImagesDeleteParams().
 		WithContext(f.ctx).WithTimeout(helpers.PIDeleteTimeOut).
@@ -118,14 +119,14 @@ func (f *IBMPIImageClient) Delete(id string) error {
 	return nil
 }
 
-// GetStockImages ...
+// Get a Stock Image
 func (f *IBMPIImageClient) GetStockImage(id string) (*models.Image, error) {
 	params := p_cloud_images.NewPcloudCloudinstancesStockimagesGetParams().
 		WithContext(f.ctx).WithTimeout(helpers.PIGetTimeOut).
 		WithCloudInstanceID(f.cloudInstanceID).WithImageID(id)
 	resp, err := f.session.Power.PCloudImages.PcloudCloudinstancesStockimagesGet(params, f.session.AuthInfo(f.cloudInstanceID))
 	if err != nil {
-		return nil, fmt.Errorf("failed to Get PI Stock Image %s for cloud instance %s: %w", id, f.cloudInstanceID, err)
+		return nil, ibmpisession.SDKFailWithAPIError(err, fmt.Errorf("failed to Get PI Stock Image %s for cloud instance %s: %w", id, f.cloudInstanceID, err))
 	}
 	if resp == nil || resp.Payload == nil {
 		return nil, fmt.Errorf("failed to Get PI Stock Image %s for cloud instance %s", id, f.cloudInstanceID)
@@ -133,7 +134,7 @@ func (f *IBMPIImageClient) GetStockImage(id string) (*models.Image, error) {
 	return resp.Payload, nil
 }
 
-// Get StockImage
+// Get All Stock Images
 func (f *IBMPIImageClient) GetAllStockImages(includeSAP bool, includeVTl bool) (*models.Images, error) {
 	params := p_cloud_images.NewPcloudCloudinstancesStockimagesGetallParams().
 		WithContext(f.ctx).WithTimeout(helpers.PIGetTimeOut).
@@ -142,7 +143,7 @@ func (f *IBMPIImageClient) GetAllStockImages(includeSAP bool, includeVTl bool) (
 		WithVtl(&includeVTl)
 	resp, err := f.session.Power.PCloudImages.PcloudCloudinstancesStockimagesGetall(params, f.session.AuthInfo(f.cloudInstanceID))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get Stock Images with (SAP=%t, VTL=%t) for cloud instance %s: %w", includeSAP, includeVTl, f.cloudInstanceID, err)
+		return nil, ibmpisession.SDKFailWithAPIError(err, fmt.Errorf("failed to get Stock Images with (SAP=%t, VTL=%t) for cloud instance %s: %w", includeSAP, includeVTl, f.cloudInstanceID, err))
 	}
 	if resp == nil || resp.Payload == nil {
 		return nil, fmt.Errorf("failed to get Stock Images with (SAP=%t, VTL=%t) for cloud instance %s", includeSAP, includeVTl, f.cloudInstanceID)
@@ -150,7 +151,7 @@ func (f *IBMPIImageClient) GetAllStockImages(includeSAP bool, includeVTl bool) (
 	return resp.Payload, nil
 }
 
-// GetAllStockSAPImages returns all stock SAP images. No Other images are included
+// Get All Stock SAP Images
 func (f *IBMPIImageClient) GetAllStockSAPImages() (*models.Images, error) {
 	// get stock images. include all available SAP images
 	images, err := f.GetAllStockImages(true, false)
@@ -168,7 +169,7 @@ func (f *IBMPIImageClient) GetAllStockSAPImages() (*models.Images, error) {
 	return sapImages, nil
 }
 
-// GetAllStockVTLImages returns all VTL images. No Other images are included
+// Get All Stock VTL Images
 func (f *IBMPIImageClient) GetAllStockVTLImages() (*models.Images, error) {
 	// get stock images. include all available stock VTL images
 	images, err := f.GetAllStockImages(false, true)
@@ -186,7 +187,7 @@ func (f *IBMPIImageClient) GetAllStockVTLImages() (*models.Images, error) {
 	return vtlImages, nil
 }
 
-// IsVtlImage returns true if image is a VTL images
+// Return true if Image is a VTL Image
 func (f *IBMPIImageClient) IsVTLImage(imageId string) (bool, error) {
 	images := new(models.Images)
 
