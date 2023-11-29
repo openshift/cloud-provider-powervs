@@ -337,7 +337,7 @@ func (p *ibmPowerVSClient) populateNodeMetadata(nodeName string, node *NodeMetad
 		Metadata: node,
 	})
 	if err != nil {
-		klog.Errorf("Nod %s failed to add node metadata to cache, Error %v", err)
+		klog.Errorf("Node %s failed to add node metadata to cache, Error %v", nodeName, err)
 	}
 	klog.Infof("Node %s internal IP is %s", nodeName, node.InternalIP)
 	klog.Infof("Node %s external IP is %s", nodeName, node.ExternalIP)
