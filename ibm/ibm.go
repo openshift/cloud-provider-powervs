@@ -109,6 +109,10 @@ type Provider struct {
 	IamEndpointOverride string `gcfg:"iamEndpointOverride"`
 	// Optional: Resource Manager endpoint override URL
 	RmEndpointOverride string `gcfg:"rmEndpointOverride"`
+	// Optional: PowerVS endpoint override URL
+	PowerVSEndpointOverride string `gcfg:"powerVSEndpointOverride"`
+	// Optional: Resource Controller endpoint override URL
+	RcEndpointOverride string `gcfg:"rcEndpointOverride"`
 	// PowerVSCloudInstanceID is IBM Power VS service instance id
 	PowerVSCloudInstanceID string `gcfg:"powerVSCloudInstanceID"`
 	// PowerVSCloudInstanceName is IBM Power VS service instance name
