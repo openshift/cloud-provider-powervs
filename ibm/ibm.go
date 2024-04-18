@@ -113,6 +113,10 @@ type Provider struct {
 	IKSPrivateEndpointHostname string `gcfg:"iksPrivateEndpointHostname"`
 	// File containing cloud credentials both for Classic and VPC
 	CloudCredentials string `gcfg:"cloudCredentials"`
+	// Optional: PowerVS endpoint override URL
+	PowerVSEndpointOverride string `gcfg:"powerVSEndpointOverride"`
+	// Optional: Resource Controller endpoint override URL
+	RcEndpointOverride string `gcfg:"rcEndpointOverride"`
 	// PowerVSCloudInstanceID is IBM Power VS service instance id
 	PowerVSCloudInstanceID string `gcfg:"powerVSCloudInstanceID"`
 	// PowerVSCloudInstanceName is IBM Power VS service instance name
