@@ -94,12 +94,21 @@ var newPowerVSSdkClient = func(provider *Provider) (Client, error) {
 		ApiKey: credential,
 	}
 
+	// If the IAM endpoint override was specified in the config, update the URL
+	if provider.IamEndpointOverride != "" {
+		authenticator.URL = provider.IamEndpointOverride
+	}
+
 	// Create the session options struct
 	options := &ibmpisession.IBMPIOptions{
 		Authenticator: authenticator,
 		UserAccount:   provider.AccountID,
-		Region:        provider.PowerVSRegion,
 		Zone:          provider.PowerVSZone,
+	}
+
+	// If the PowerVS endpoint override was specified in the config, update the URL
+	if provider.PowerVSEndpointOverride != "" {
+		options.URL = provider.PowerVSEndpointOverride
 	}
 
 	// Construct the session service instance
@@ -110,11 +119,17 @@ var newPowerVSSdkClient = func(provider *Provider) (Client, error) {
 	}
 	client := &powerVSClient{}
 	if provider.PowerVSCloudInstanceID == "" {
-		rcv2, err := rc.NewResourceControllerV2(&rc.ResourceControllerV2Options{
+		rcOptions := &rc.ResourceControllerV2Options{
 			Authenticator: &core.IamAuthenticator{
 				ApiKey: credential,
 			},
-		})
+		}
+		// If the resource controller endpoint override was specified in the config, update the URL
+		if provider.RcEndpointOverride != "" {
+			rcOptions.URL = provider.RcEndpointOverride
+		}
+
+		rcv2, err := rc.NewResourceControllerV2(rcOptions)
 		if err != nil {
 			klog.Errorf("failed to create resource controller to fetch service instance id, error: %v", err)
 			return nil, err
