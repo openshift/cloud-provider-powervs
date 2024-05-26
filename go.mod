@@ -1,6 +1,6 @@
 module cloud.ibm.com/cloud-provider-ibm
 
-go 1.20
+go 1.22
 
 require (
 	github.com/IBM-Cloud/power-go-client v1.5.4
