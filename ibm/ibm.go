@@ -1,6 +1,6 @@
 /*******************************************************************************
 * IBM Cloud Kubernetes Service, 5737-D43
-* (C) Copyright IBM Corp. 2017, 2023 All Rights Reserved.
+* (C) Copyright IBM Corp. 2017, 2024 All Rights Reserved.
 *
 * SPDX-License-Identifier: Apache2.0
 *
@@ -109,18 +109,6 @@ type Provider struct {
 	IamEndpointOverride string `gcfg:"iamEndpointOverride"`
 	// Optional: Resource Manager endpoint override URL
 	RmEndpointOverride string `gcfg:"rmEndpointOverride"`
-	// Optional: PowerVS endpoint override URL
-	PowerVSEndpointOverride string `gcfg:"powerVSEndpointOverride"`
-	// Optional: Resource Controller endpoint override URL
-	RcEndpointOverride string `gcfg:"rcEndpointOverride"`
-	// PowerVSCloudInstanceID is IBM Power VS service instance id
-	PowerVSCloudInstanceID string `gcfg:"powerVSCloudInstanceID"`
-	// PowerVSCloudInstanceName is IBM Power VS service instance name
-	PowerVSCloudInstanceName string `gcfg:"powerVSCloudInstanceName"`
-	// PowerVSRegion is IBM Power VS service region
-	PowerVSRegion string `gcfg:"powerVSRegion"`
-	// PowerVSZone is IBM Power VS service zone
-	PowerVSZone string `gcfg:"powerVSZone"`
 }
 
 // CloudConfig is the ibm cloud provider config data.
@@ -189,6 +177,7 @@ func (c *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 	}
 
 	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
+	// #nosec G104 Error is ignored for now
 	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		DeleteFunc: c.handleNodeDelete,
 	})
