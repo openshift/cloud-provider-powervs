@@ -45,14 +45,14 @@ YAML_FILES=$(shell find . -type f -name '*.y*ml' -not -path "./build-tools/*" -n
 INI_FILES=$(shell find . -type f -name '*.ini' -not -path "./build-tools/*")
 OSS_FILES := go.mod
 
-GOLANGCI_LINT_VERSION := 1.53.2
+GOLANGCI_LINT_VERSION := 1.54.2
 GOLANGCI_LINT_EXISTS := $(shell golangci-lint --version 2>/dev/null)
 
 HUB_RLS ?= 2.14.2
 REGISTRY ?= armada-master
-TAG ?= v1.28.4
+TAG ?= v1.29.5
 
-NANCY_VERSION := 1.0.42
+NANCY_VERSION := 1.0.45
 
 WORKSPACE=$(GOPATH)/src/k8s.io
 
@@ -102,7 +102,7 @@ kube-update:
 .PHONY: fmt
 fmt:
 ifdef GOLANGCI_LINT_EXISTS
-	golangci-lint run --disable-all --no-config --enable=gofmt
+	golangci-lint run --disable-all --no-config --enable=gofmt --timeout 5m
 else
 	@echo "golangci-lint is not installed"
 	exit 1
@@ -157,7 +157,7 @@ fvttest:
 .PHONY: runanalyzedeps
 runanalyzedeps:
 	which nancy || $(MAKE) install-nancy-dep-scanner
-	go list -json -deps | nancy sleuth -e sonatype-2022-6522,CVE-2020-8561 --no-color > nancy.log 2>&1; scripts/process_nancy_log.sh $$?
+	go list -json -deps | nancy sleuth --no-color > nancy.log 2>&1; scripts/process_nancy_log.sh $$?
 
 .PHONY: install-nancy-dep-scanner
 install-nancy-dep-scanner:
