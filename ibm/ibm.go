@@ -109,18 +109,6 @@ type Provider struct {
 	IamEndpointOverride string `gcfg:"iamEndpointOverride"`
 	// Optional: Resource Manager endpoint override URL
 	RmEndpointOverride string `gcfg:"rmEndpointOverride"`
-	// Optional: PowerVS endpoint override URL
-	PowerVSEndpointOverride string `gcfg:"powerVSEndpointOverride"`
-	// Optional: Resource Controller endpoint override URL
-	RcEndpointOverride string `gcfg:"rcEndpointOverride"`
-	// PowerVSCloudInstanceID is IBM Power VS service instance id
-	PowerVSCloudInstanceID string `gcfg:"powerVSCloudInstanceID"`
-	// PowerVSCloudInstanceName is IBM Power VS service instance name
-	PowerVSCloudInstanceName string `gcfg:"powerVSCloudInstanceName"`
-	// PowerVSRegion is IBM Power VS service region
-	PowerVSRegion string `gcfg:"powerVSRegion"`
-	// PowerVSZone is IBM Power VS service zone
-	PowerVSZone string `gcfg:"powerVSZone"`
 }
 
 // CloudConfig is the ibm cloud provider config data.
@@ -145,6 +133,8 @@ type CloudConfig struct {
 		// If set to true, all new nodes will get the condition NetworkUnavailable
 		// during node registration
 		SetNetworkUnavailable bool `gcfg:"set-network-unavailable,false"`
+		// The CNI being used by the cluster: "Calico" or "OVNKubernetes".
+		CniProvider string `gcfg:"cniProvider"`
 	}
 	// [load-balancer-deployment] section
 	LBDeployment LoadBalancerDeployment `gcfg:"load-balancer-deployment"`
