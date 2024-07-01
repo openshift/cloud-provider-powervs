@@ -89,7 +89,7 @@ type PVMInstanceReference struct {
 
 	// Processor type (dedicated, shared, capped)
 	// Required: true
-	// Enum: [dedicated shared capped]
+	// Enum: ["dedicated","shared","capped"]
 	ProcType *string `json:"procType"`
 
 	// Number of processors allocated
@@ -126,6 +126,9 @@ type PVMInstanceReference struct {
 	// Required: true
 	Status *string `json:"status"`
 
+	// The storage connection type
+	StorageConnection string `json:"storageConnection,omitempty"`
+
 	// Storage Pool where server is deployed
 	StoragePool string `json:"storagePool,omitempty"`
 
@@ -137,6 +140,9 @@ type PVMInstanceReference struct {
 
 	// System type used to host the instance
 	SysType string `json:"sysType,omitempty"`
+
+	// Represents the task state of a virtual machine (VM).
+	TaskState string `json:"taskState,omitempty"`
 
 	// Date/Time of PVM last update
 	// Format: date-time

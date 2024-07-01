@@ -254,3 +254,27 @@ func (f *IBMPIVolumeClient) GetVolumeFlashCopyMappings(id string) (models.FlashC
 	}
 	return resp.Payload, nil
 }
+
+// Bulk volume detach
+func (f *IBMPIVolumeClient) BulkVolumeDetach(pvmID string, body *models.VolumesDetach) (*models.VolumesDetachmentResponse, error) {
+	return nil, fmt.Errorf("operation not supported")
+}
+
+// Bulk volume delete
+func (f *IBMPIVolumeClient) BulkVolumeDelete(body *models.VolumesDelete) (*models.VolumesDeleteResponse, error) {
+	return nil, fmt.Errorf("operation not supported")
+}
+
+// Bulk volutme attach
+func (f *IBMPIVolumeClient) BulkVolumeAttach(pvmID string, body *models.VolumesAttach) (*models.VolumesAttachmentResponse, error) {
+	params := p_cloud_volumes.NewPcloudV2PvminstancesVolumesPostParams().WithContext(f.ctx).WithTimeout(helpers.PICreateTimeOut).
+		WithCloudInstanceID(f.cloudInstanceID).WithPvmInstanceID(pvmID).WithBody(body)
+	resp, err := f.session.Power.PCloudVolumes.PcloudV2PvminstancesVolumesPost(params, f.session.AuthInfo(f.cloudInstanceID))
+	if err != nil {
+		return nil, ibmpisession.SDKFailWithAPIError(err, fmt.Errorf(errors.AttachVolumesOperationFailed, body.VolumeIDs, err))
+	}
+	if resp == nil || resp.Payload == nil {
+		return nil, fmt.Errorf("failed to Attach volumes %s to server %s", body.VolumeIDs, pvmID)
+	}
+	return resp.Payload, nil
+}
