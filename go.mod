@@ -1,25 +1,27 @@
 module cloud.ibm.com/cloud-provider-ibm
 
-go 1.21.9
+go 1.22
+
+toolchain go1.22.4
 
 require (
-	github.com/IBM-Cloud/power-go-client v1.6.0
-	github.com/IBM/go-sdk-core/v5 v5.17.3
-	github.com/IBM/platform-services-go-sdk v0.63.1
-	github.com/IBM/vpc-go-sdk v0.51.0
+	github.com/IBM-Cloud/power-go-client v1.7.0
+	github.com/IBM/go-sdk-core/v5 v5.17.4
+	github.com/IBM/platform-services-go-sdk v0.64.2
+	github.com/IBM/vpc-go-sdk v0.53.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-openapi/strfmt v0.23.0
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
 	gopkg.in/gcfg.v1 v1.2.3
-	k8s.io/api v0.29.5
-	k8s.io/apimachinery v0.29.5
-	k8s.io/client-go v0.29.5
-	k8s.io/cloud-provider v0.29.5
-	k8s.io/component-base v0.29.5
-	k8s.io/component-helpers v0.29.5
-	k8s.io/klog/v2 v2.120.1
+	k8s.io/api v0.29.6
+	k8s.io/apimachinery v0.29.6
+	k8s.io/client-go v0.29.6
+	k8s.io/cloud-provider v0.29.6
+	k8s.io/component-base v0.29.6
+	k8s.io/component-helpers v0.29.6
+	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
 
@@ -64,7 +66,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/hashicorp/go-retryablehttp v0.7.5 // indirect
+	github.com/hashicorp/go-retryablehttp v0.7.7 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
@@ -107,7 +109,7 @@ require (
 	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/oauth2 v0.11.0 // indirect
 	golang.org/x/sync v0.5.0 // indirect
-	golang.org/x/sys v0.18.0 // indirect
+	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
@@ -122,9 +124,9 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiserver v0.29.5 // indirect
-	k8s.io/controller-manager v0.29.5 // indirect
-	k8s.io/kms v0.29.5 // indirect
+	k8s.io/apiserver v0.29.6 // indirect
+	k8s.io/controller-manager v0.29.6 // indirect
+	k8s.io/kms v0.29.6 // indirect
 	k8s.io/kube-openapi v0.0.0-20231010175941-2dd684a91f00 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.28.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect

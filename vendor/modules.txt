@@ -2,8 +2,8 @@
 ## explicit; go 1.16
 github.com/Azure/go-ansiterm
 github.com/Azure/go-ansiterm/winterm
-# github.com/IBM-Cloud/power-go-client v1.6.0
-## explicit; go 1.20
+# github.com/IBM-Cloud/power-go-client v1.7.0
+## explicit; go 1.22
 github.com/IBM-Cloud/power-go-client/clients/instance
 github.com/IBM-Cloud/power-go-client/errors
 github.com/IBM-Cloud/power-go-client/helpers
@@ -14,6 +14,7 @@ github.com/IBM-Cloud/power-go-client/power/client/bluemix_service_instances
 github.com/IBM-Cloud/power-go-client/power/client/catalog
 github.com/IBM-Cloud/power-go-client/power/client/datacenters
 github.com/IBM-Cloud/power-go-client/power/client/hardware_platforms
+github.com/IBM-Cloud/power-go-client/power/client/host_groups
 github.com/IBM-Cloud/power-go-client/power/client/iaas_service_broker
 github.com/IBM-Cloud/power-go-client/power/client/internal_power_v_s_instances
 github.com/IBM-Cloud/power-go-client/power/client/internal_power_v_s_locations
@@ -46,22 +47,24 @@ github.com/IBM-Cloud/power-go-client/power/client/p_cloud_v_p_n_policies
 github.com/IBM-Cloud/power-go-client/power/client/p_cloud_volume_groups
 github.com/IBM-Cloud/power-go-client/power/client/p_cloud_volume_onboarding
 github.com/IBM-Cloud/power-go-client/power/client/p_cloud_volumes
+github.com/IBM-Cloud/power-go-client/power/client/power_edge_router
 github.com/IBM-Cloud/power-go-client/power/client/service_bindings
 github.com/IBM-Cloud/power-go-client/power/client/service_instances
+github.com/IBM-Cloud/power-go-client/power/client/snapshots
 github.com/IBM-Cloud/power-go-client/power/client/storage_types
 github.com/IBM-Cloud/power-go-client/power/client/swagger_spec
 github.com/IBM-Cloud/power-go-client/power/client/workspaces
 github.com/IBM-Cloud/power-go-client/power/models
-# github.com/IBM/go-sdk-core/v5 v5.17.3
+# github.com/IBM/go-sdk-core/v5 v5.17.4
 ## explicit; go 1.20
 github.com/IBM/go-sdk-core/v5/core
-# github.com/IBM/platform-services-go-sdk v0.63.1
+# github.com/IBM/platform-services-go-sdk v0.64.2
 ## explicit; go 1.20
 github.com/IBM/platform-services-go-sdk/common
 github.com/IBM/platform-services-go-sdk/resourcecontrollerv2
 github.com/IBM/platform-services-go-sdk/resourcemanagerv2
-# github.com/IBM/vpc-go-sdk v0.51.0
-## explicit; go 1.18
+# github.com/IBM/vpc-go-sdk v0.53.0
+## explicit; go 1.20
 github.com/IBM/vpc-go-sdk/common
 github.com/IBM/vpc-go-sdk/vpcv1
 # github.com/NYTimes/gziphandler v1.1.1
@@ -249,8 +252,8 @@ github.com/grpc-ecosystem/grpc-gateway/v2/utilities
 # github.com/hashicorp/go-cleanhttp v0.5.2
 ## explicit; go 1.13
 github.com/hashicorp/go-cleanhttp
-# github.com/hashicorp/go-retryablehttp v0.7.5
-## explicit; go 1.13
+# github.com/hashicorp/go-retryablehttp v0.7.7
+## explicit; go 1.19
 github.com/hashicorp/go-retryablehttp
 # github.com/imdario/mergo v0.3.12
 ## explicit; go 1.13
@@ -327,7 +330,7 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/spf13/cobra v1.8.0
+# github.com/spf13/cobra v1.8.1
 ## explicit; go 1.15
 github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.5
@@ -475,7 +478,7 @@ golang.org/x/oauth2/internal
 # golang.org/x/sync v0.5.0
 ## explicit; go 1.18
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.18.0
+# golang.org/x/sys v0.20.0
 ## explicit; go 1.18
 golang.org/x/sys/cpu
 golang.org/x/sys/plan9
@@ -645,7 +648,7 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# k8s.io/api v0.29.5
+# k8s.io/api v0.29.6
 ## explicit; go 1.21
 k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
@@ -701,7 +704,7 @@ k8s.io/api/scheduling/v1beta1
 k8s.io/api/storage/v1
 k8s.io/api/storage/v1alpha1
 k8s.io/api/storage/v1beta1
-# k8s.io/apimachinery v0.29.5
+# k8s.io/apimachinery v0.29.6
 ## explicit; go 1.21
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
@@ -761,7 +764,7 @@ k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/apiserver v0.29.5
+# k8s.io/apiserver v0.29.6
 ## explicit; go 1.21
 k8s.io/apiserver/pkg/admission
 k8s.io/apiserver/pkg/admission/cel
@@ -909,7 +912,7 @@ k8s.io/apiserver/plugin/pkg/audit/truncate
 k8s.io/apiserver/plugin/pkg/audit/webhook
 k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 k8s.io/apiserver/plugin/pkg/authorizer/webhook
-# k8s.io/client-go v0.29.5
+# k8s.io/client-go v0.29.6
 ## explicit; go 1.21
 k8s.io/client-go/applyconfigurations/admissionregistration/v1
 k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1
@@ -1223,7 +1226,7 @@ k8s.io/client-go/util/homedir
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/retry
 k8s.io/client-go/util/workqueue
-# k8s.io/cloud-provider v0.29.5
+# k8s.io/cloud-provider v0.29.6
 ## explicit; go 1.21
 k8s.io/cloud-provider
 k8s.io/cloud-provider/api
@@ -1244,7 +1247,7 @@ k8s.io/cloud-provider/names
 k8s.io/cloud-provider/node/helpers
 k8s.io/cloud-provider/options
 k8s.io/cloud-provider/service/helpers
-# k8s.io/component-base v0.29.5
+# k8s.io/component-base v0.29.6
 ## explicit; go 1.21
 k8s.io/component-base/cli
 k8s.io/component-base/cli/flag
@@ -1276,10 +1279,10 @@ k8s.io/component-base/tracing
 k8s.io/component-base/tracing/api/v1
 k8s.io/component-base/version
 k8s.io/component-base/version/verflag
-# k8s.io/component-helpers v0.29.5
+# k8s.io/component-helpers v0.29.6
 ## explicit; go 1.21
 k8s.io/component-helpers/node/util
-# k8s.io/controller-manager v0.29.5
+# k8s.io/controller-manager v0.29.6
 ## explicit; go 1.21
 k8s.io/controller-manager/app
 k8s.io/controller-manager/config
@@ -1296,7 +1299,7 @@ k8s.io/controller-manager/pkg/informerfactory
 k8s.io/controller-manager/pkg/leadermigration
 k8s.io/controller-manager/pkg/leadermigration/config
 k8s.io/controller-manager/pkg/leadermigration/options
-# k8s.io/klog/v2 v2.120.1
+# k8s.io/klog/v2 v2.130.1
 ## explicit; go 1.18
 k8s.io/klog/v2
 k8s.io/klog/v2/internal/buffer
@@ -1305,7 +1308,7 @@ k8s.io/klog/v2/internal/dbg
 k8s.io/klog/v2/internal/serialize
 k8s.io/klog/v2/internal/severity
 k8s.io/klog/v2/internal/sloghandler
-# k8s.io/kms v0.29.5
+# k8s.io/kms v0.29.6
 ## explicit; go 1.21
 k8s.io/kms/apis/v1beta1
 k8s.io/kms/apis/v2
