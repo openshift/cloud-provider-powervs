@@ -20,6 +20,12 @@ import (
 // swagger:model SAPCreate
 type SAPCreate struct {
 
+	// The deployment of a dedicated host
+	DeploymentTarget *DeploymentTarget `json:"deploymentTarget,omitempty"`
+
+	// Custom SAP Deployment Type Information (For Internal Use Only)
+	DeploymentType string `json:"deploymentType,omitempty"`
+
 	// Image ID of the sap image to use for the server
 	// Required: true
 	ImageID *string `json:"imageID"`
@@ -48,19 +54,19 @@ type SAPCreate struct {
 	// The name of the SSH Key to provide to the server for authenticating
 	SSHKeyName string `json:"sshKeyName,omitempty"`
 
-	// The storage affinity data; ignored if storagePool is provided; Only valid when you deploy one of the IBM supplied stock images. Storage type and pool for a custom image (an imported image or an image that is created from a PVMInstance capture) defaults to the storage type and pool the image was created in
+	// The storage affinity data; ignored if storagePool is provided; Only valid when you deploy one of the IBM supplied stock images. Storage pool for a custom image (an imported image or an image that is created from a PVMInstance capture) defaults to the storage pool the image was created in
 	StorageAffinity *StorageAffinity `json:"storageAffinity,omitempty"`
 
-	// Storage Pool for server deployment; if provided then storageAffinity and storageType will be ignored; Only valid when you deploy one of the IBM supplied stock images. Storage type and pool for a custom image (an imported image or an image that is created from a PVMInstance capture) defaults to the storage type and pool the image was created in
+	// Storage Pool for server deployment; if provided then storageAffinity and storageType will be ignored; Only valid when you deploy one of the IBM supplied stock images. Storage pool for a custom image (an imported image or an image that is created from a PVMInstance capture) defaults to the storage pool the image was created in
 	StoragePool string `json:"storagePool,omitempty"`
 
-	// Storage type for server deployment; will be ignored if storagePool or storageAffinity is provided; Only valid when you deploy one of the IBM supplied stock images. Storage type and pool for a custom image (an imported image or an image that is created from a PVMInstance capture) defaults to the storage type and pool the image was created in
+	// Storage type for server deployment; if storageType is not provided the storage type will default to 'tier3'.
 	StorageType string `json:"storageType,omitempty"`
 
 	// System type used to host the instance. Only e880, e980, e1080 are supported
 	SysType string `json:"sysType,omitempty"`
 
-	// Cloud init user defined data
+	// Cloud init user defined data; For FLS, only cloud-config instance-data is supported and data must not be compressed or exceed 63K
 	UserData string `json:"userData,omitempty"`
 
 	// List of Volume IDs to attach to the pvm-instance on creation
@@ -70,6 +76,10 @@ type SAPCreate struct {
 // Validate validates this s a p create
 func (m *SAPCreate) Validate(formats strfmt.Registry) error {
 	var res []error
+
+	if err := m.validateDeploymentTarget(formats); err != nil {
+		res = append(res, err)
+	}
 
 	if err := m.validateImageID(formats); err != nil {
 		res = append(res, err)
@@ -102,6 +112,25 @@ func (m *SAPCreate) Validate(formats strfmt.Registry) error {
 	if len(res) > 0 {
 		return errors.CompositeValidationError(res...)
 	}
+	return nil
+}
+
+func (m *SAPCreate) validateDeploymentTarget(formats strfmt.Registry) error {
+	if swag.IsZero(m.DeploymentTarget) { // not required
+		return nil
+	}
+
+	if m.DeploymentTarget != nil {
+		if err := m.DeploymentTarget.Validate(formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("deploymentTarget")
+			} else if ce, ok := err.(*errors.CompositeError); ok {
+				return ce.ValidateName("deploymentTarget")
+			}
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -218,6 +247,10 @@ func (m *SAPCreate) validateStorageAffinity(formats strfmt.Registry) error {
 func (m *SAPCreate) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	var res []error
 
+	if err := m.contextValidateDeploymentTarget(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
 	if err := m.contextValidateInstances(ctx, formats); err != nil {
 		res = append(res, err)
 	}
@@ -240,9 +273,35 @@ func (m *SAPCreate) ContextValidate(ctx context.Context, formats strfmt.Registry
 	return nil
 }
 
+func (m *SAPCreate) contextValidateDeploymentTarget(ctx context.Context, formats strfmt.Registry) error {
+
+	if m.DeploymentTarget != nil {
+
+		if swag.IsZero(m.DeploymentTarget) { // not required
+			return nil
+		}
+
+		if err := m.DeploymentTarget.ContextValidate(ctx, formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("deploymentTarget")
+			} else if ce, ok := err.(*errors.CompositeError); ok {
+				return ce.ValidateName("deploymentTarget")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (m *SAPCreate) contextValidateInstances(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.Instances != nil {
+
+		if swag.IsZero(m.Instances) { // not required
+			return nil
+		}
+
 		if err := m.Instances.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("instances")
@@ -261,6 +320,11 @@ func (m *SAPCreate) contextValidateNetworks(ctx context.Context, formats strfmt.
 	for i := 0; i < len(m.Networks); i++ {
 
 		if m.Networks[i] != nil {
+
+			if swag.IsZero(m.Networks[i]) { // not required
+				return nil
+			}
+
 			if err := m.Networks[i].ContextValidate(ctx, formats); err != nil {
 				if ve, ok := err.(*errors.Validation); ok {
 					return ve.ValidateName("networks" + "." + strconv.Itoa(i))
@@ -278,6 +342,10 @@ func (m *SAPCreate) contextValidateNetworks(ctx context.Context, formats strfmt.
 
 func (m *SAPCreate) contextValidatePinPolicy(ctx context.Context, formats strfmt.Registry) error {
 
+	if swag.IsZero(m.PinPolicy) { // not required
+		return nil
+	}
+
 	if err := m.PinPolicy.ContextValidate(ctx, formats); err != nil {
 		if ve, ok := err.(*errors.Validation); ok {
 			return ve.ValidateName("pinPolicy")
@@ -293,6 +361,11 @@ func (m *SAPCreate) contextValidatePinPolicy(ctx context.Context, formats strfmt
 func (m *SAPCreate) contextValidateStorageAffinity(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.StorageAffinity != nil {
+
+		if swag.IsZero(m.StorageAffinity) { // not required
+			return nil
+		}
+
 		if err := m.StorageAffinity.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("storageAffinity")

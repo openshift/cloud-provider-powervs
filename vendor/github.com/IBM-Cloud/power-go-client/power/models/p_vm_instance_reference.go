@@ -89,7 +89,7 @@ type PVMInstanceReference struct {
 
 	// Processor type (dedicated, shared, capped)
 	// Required: true
-	// Enum: [dedicated shared capped]
+	// Enum: ["dedicated","shared","capped"]
 	ProcType *string `json:"procType"`
 
 	// Number of processors allocated
@@ -110,6 +110,12 @@ type PVMInstanceReference struct {
 	// Required: true
 	ServerName *string `json:"serverName"`
 
+	// The shared processor pool of the server
+	SharedProcessorPool string `json:"sharedProcessorPool,omitempty"`
+
+	// The shared processor pool id
+	SharedProcessorPoolID string `json:"sharedProcessorPoolID,omitempty"`
+
 	// The pvm instance Software Licenses
 	SoftwareLicenses *SoftwareLicenses `json:"softwareLicenses,omitempty"`
 
@@ -119,6 +125,9 @@ type PVMInstanceReference struct {
 	// The status of the instance
 	// Required: true
 	Status *string `json:"status"`
+
+	// The storage connection type
+	StorageConnection string `json:"storageConnection,omitempty"`
 
 	// Storage Pool where server is deployed
 	StoragePool string `json:"storagePool,omitempty"`
@@ -131,6 +140,9 @@ type PVMInstanceReference struct {
 
 	// System type used to host the instance
 	SysType string `json:"sysType,omitempty"`
+
+	// Represents the task state of a virtual machine (VM).
+	TaskState string `json:"taskState,omitempty"`
 
 	// Date/Time of PVM last update
 	// Format: date-time
@@ -632,6 +644,11 @@ func (m *PVMInstanceReference) contextValidateAddresses(ctx context.Context, for
 	for i := 0; i < len(m.Addresses); i++ {
 
 		if m.Addresses[i] != nil {
+
+			if swag.IsZero(m.Addresses[i]) { // not required
+				return nil
+			}
+
 			if err := m.Addresses[i].ContextValidate(ctx, formats); err != nil {
 				if ve, ok := err.(*errors.Validation); ok {
 					return ve.ValidateName("addresses" + "." + strconv.Itoa(i))
@@ -650,6 +667,11 @@ func (m *PVMInstanceReference) contextValidateAddresses(ctx context.Context, for
 func (m *PVMInstanceReference) contextValidateConsoleLanguage(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.ConsoleLanguage != nil {
+
+		if swag.IsZero(m.ConsoleLanguage) { // not required
+			return nil
+		}
+
 		if err := m.ConsoleLanguage.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("consoleLanguage")
@@ -666,6 +688,11 @@ func (m *PVMInstanceReference) contextValidateConsoleLanguage(ctx context.Contex
 func (m *PVMInstanceReference) contextValidateFault(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.Fault != nil {
+
+		if swag.IsZero(m.Fault) { // not required
+			return nil
+		}
+
 		if err := m.Fault.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("fault")
@@ -682,6 +709,11 @@ func (m *PVMInstanceReference) contextValidateFault(ctx context.Context, formats
 func (m *PVMInstanceReference) contextValidateHealth(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.Health != nil {
+
+		if swag.IsZero(m.Health) { // not required
+			return nil
+		}
+
 		if err := m.Health.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("health")
@@ -700,6 +732,11 @@ func (m *PVMInstanceReference) contextValidateNetworks(ctx context.Context, form
 	for i := 0; i < len(m.Networks); i++ {
 
 		if m.Networks[i] != nil {
+
+			if swag.IsZero(m.Networks[i]) { // not required
+				return nil
+			}
+
 			if err := m.Networks[i].ContextValidate(ctx, formats); err != nil {
 				if ve, ok := err.(*errors.Validation); ok {
 					return ve.ValidateName("networks" + "." + strconv.Itoa(i))
@@ -718,6 +755,11 @@ func (m *PVMInstanceReference) contextValidateNetworks(ctx context.Context, form
 func (m *PVMInstanceReference) contextValidateSapProfile(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.SapProfile != nil {
+
+		if swag.IsZero(m.SapProfile) { // not required
+			return nil
+		}
+
 		if err := m.SapProfile.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("sapProfile")
@@ -734,6 +776,11 @@ func (m *PVMInstanceReference) contextValidateSapProfile(ctx context.Context, fo
 func (m *PVMInstanceReference) contextValidateSoftwareLicenses(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.SoftwareLicenses != nil {
+
+		if swag.IsZero(m.SoftwareLicenses) { // not required
+			return nil
+		}
+
 		if err := m.SoftwareLicenses.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("softwareLicenses")
@@ -754,6 +801,11 @@ func (m *PVMInstanceReference) contextValidateSrcs(ctx context.Context, formats 
 		for ii := 0; ii < len(m.Srcs[i]); ii++ {
 
 			if m.Srcs[i][ii] != nil {
+
+				if swag.IsZero(m.Srcs[i][ii]) { // not required
+					return nil
+				}
+
 				if err := m.Srcs[i][ii].ContextValidate(ctx, formats); err != nil {
 					if ve, ok := err.(*errors.Validation); ok {
 						return ve.ValidateName("srcs" + "." + strconv.Itoa(i) + "." + strconv.Itoa(ii))
@@ -774,6 +826,11 @@ func (m *PVMInstanceReference) contextValidateSrcs(ctx context.Context, formats 
 func (m *PVMInstanceReference) contextValidateVirtualCores(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.VirtualCores != nil {
+
+		if swag.IsZero(m.VirtualCores) { // not required
+			return nil
+		}
+
 		if err := m.VirtualCores.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("virtualCores")

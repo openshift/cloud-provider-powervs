@@ -24,7 +24,7 @@ type MultiVolumesCreate struct {
 	AffinityPVMInstance *string `json:"affinityPVMInstance,omitempty"`
 
 	// Affinity policy for data volume being created; ignored if volumePool provided; for policy 'affinity' requires one of affinityPVMInstance or affinityVolume to be specified; for policy 'anti-affinity' requires one of antiAffinityPVMInstances or antiAffinityVolumes to be specified
-	// Enum: [affinity anti-affinity]
+	// Enum: ["affinity","anti-affinity"]
 	AffinityPolicy *string `json:"affinityPolicy,omitempty"`
 
 	// Volume (ID or Name) to base volume affinity policy against; required if requesting affinity and affinityPVMInstance is not provided
@@ -39,7 +39,7 @@ type MultiVolumesCreate struct {
 	// Number of volumes to create
 	Count int64 `json:"count,omitempty"`
 
-	// Type of Disk, required if affinityPolicy and volumePool not provided, otherwise ignored
+	// Type of Disk; if diskType is not provided the disk type will default to 'tier3'.
 	DiskType string `json:"diskType,omitempty"`
 
 	// Base name of the volume(s)
@@ -49,6 +49,9 @@ type MultiVolumesCreate struct {
 	// Indicates if the volume should be replication enabled or not
 	ReplicationEnabled *bool `json:"replicationEnabled,omitempty"`
 
+	// List of replication sites for volume replication
+	ReplicationSite []string `json:"replicationSite,omitempty"`
+
 	// Indicates if the volume is shareable between VMs
 	Shareable *bool `json:"shareable,omitempty"`
 
@@ -56,7 +59,7 @@ type MultiVolumesCreate struct {
 	// Required: true
 	Size *int64 `json:"size"`
 
-	// Volume pool where the volume will be created; if provided then diskType and affinityPolicy values will be ignored
+	// Volume pool where the volume will be created; if provided then affinityPolicy value will be ignored
 	VolumePool string `json:"volumePool,omitempty"`
 }
 

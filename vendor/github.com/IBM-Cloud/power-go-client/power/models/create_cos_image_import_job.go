@@ -24,12 +24,15 @@ type CreateCosImageImportJob struct {
 	AccessKey string `json:"accessKey,omitempty"`
 
 	// indicates if the bucket has public or private access public access require no authentication keys private access requires hmac authentication keys (access,secret)
-	// Enum: [public private]
+	// Enum: ["public","private"]
 	BucketAccess *string `json:"bucketAccess,omitempty"`
 
 	// Cloud Object Storage bucket name; bucket-name[/optional/folder]
 	// Required: true
 	BucketName *string `json:"bucketName"`
+
+	// Import and Check checksum file
+	Checksum bool `json:"checksum,omitempty"`
 
 	// Cloud Object Storage image filename
 	// Required: true
@@ -39,8 +42,11 @@ type CreateCosImageImportJob struct {
 	// Required: true
 	ImageName *string `json:"imageName"`
 
+	// Import details for SAP images
+	ImportDetails *ImageImportDetails `json:"importDetails,omitempty"`
+
 	// Image OS Type, required if importing a raw image; raw images can only be imported using the command line interface
-	// Enum: [aix ibmi rhel sles]
+	// Enum: ["aix","ibmi","rhel","sles"]
 	OsType string `json:"osType,omitempty"`
 
 	// Cloud Object Storage region
@@ -53,10 +59,10 @@ type CreateCosImageImportJob struct {
 	// Storage affinity data used for storage pool selection
 	StorageAffinity *StorageAffinity `json:"storageAffinity,omitempty"`
 
-	// Storage pool where the image will be loaded, if provided then storageType and storageAffinity will be ignored
+	// Storage pool where the image will be loaded, if provided then storageAffinity will be ignored
 	StoragePool string `json:"storagePool,omitempty"`
 
-	// Type of storage; will be ignored if storagePool or storageAffinity is provided. If only using storageType for storage selection then the storage pool with the most available space will be selected
+	// Type of storage; If only using storageType for storage selection then the storage pool with the most available space will be selected if storageType is not provided the storage type will default to 'tier3'.
 	StorageType string `json:"storageType,omitempty"`
 }
 
@@ -77,6 +83,10 @@ func (m *CreateCosImageImportJob) Validate(formats strfmt.Registry) error {
 	}
 
 	if err := m.validateImageName(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateImportDetails(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -167,6 +177,25 @@ func (m *CreateCosImageImportJob) validateImageName(formats strfmt.Registry) err
 	return nil
 }
 
+func (m *CreateCosImageImportJob) validateImportDetails(formats strfmt.Registry) error {
+	if swag.IsZero(m.ImportDetails) { // not required
+		return nil
+	}
+
+	if m.ImportDetails != nil {
+		if err := m.ImportDetails.Validate(formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("importDetails")
+			} else if ce, ok := err.(*errors.CompositeError); ok {
+				return ce.ValidateName("importDetails")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
 var createCosImageImportJobTypeOsTypePropEnum []interface{}
 
 func init() {
@@ -247,6 +276,10 @@ func (m *CreateCosImageImportJob) validateStorageAffinity(formats strfmt.Registr
 func (m *CreateCosImageImportJob) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
 	var res []error
 
+	if err := m.contextValidateImportDetails(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
 	if err := m.contextValidateStorageAffinity(ctx, formats); err != nil {
 		res = append(res, err)
 	}
@@ -257,9 +290,35 @@ func (m *CreateCosImageImportJob) ContextValidate(ctx context.Context, formats s
 	return nil
 }
 
+func (m *CreateCosImageImportJob) contextValidateImportDetails(ctx context.Context, formats strfmt.Registry) error {
+
+	if m.ImportDetails != nil {
+
+		if swag.IsZero(m.ImportDetails) { // not required
+			return nil
+		}
+
+		if err := m.ImportDetails.ContextValidate(ctx, formats); err != nil {
+			if ve, ok := err.(*errors.Validation); ok {
+				return ve.ValidateName("importDetails")
+			} else if ce, ok := err.(*errors.CompositeError); ok {
+				return ce.ValidateName("importDetails")
+			}
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (m *CreateCosImageImportJob) contextValidateStorageAffinity(ctx context.Context, formats strfmt.Registry) error {
 
 	if m.StorageAffinity != nil {
+
+		if swag.IsZero(m.StorageAffinity) { // not required
+			return nil
+		}
+
 		if err := m.StorageAffinity.ContextValidate(ctx, formats); err != nil {
 			if ve, ok := err.(*errors.Validation); ok {
 				return ve.ValidateName("storageAffinity")
