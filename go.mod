@@ -1,8 +1,9 @@
 module cloud.ibm.com/cloud-provider-ibm
 
-go 1.22
+go 1.22.4
 
 require (
+	github.com/IBM-Cloud/power-go-client v1.7.0
 	github.com/IBM/go-sdk-core/v5 v5.17.4
 	github.com/IBM/platform-services-go-sdk v0.65.0
 	github.com/IBM/vpc-go-sdk v0.55.0
@@ -19,11 +20,11 @@ require (
 	k8s.io/component-base v0.30.3
 	k8s.io/component-helpers v0.30.3
 	k8s.io/klog/v2 v2.130.1
+	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
-	github.com/IBM-Cloud/power-go-client v1.5.4 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230305170008-8188dc5388df // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
@@ -40,15 +41,15 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-openapi/analysis v0.21.4 // indirect
-	github.com/go-openapi/errors v0.20.4 // indirect
-	github.com/go-openapi/jsonpointer v0.19.6 // indirect
-	github.com/go-openapi/jsonreference v0.20.2 // indirect
-	github.com/go-openapi/loads v0.21.2 // indirect
+	github.com/go-openapi/analysis v0.21.5 // indirect
+	github.com/go-openapi/errors v0.22.0 // indirect
+	github.com/go-openapi/jsonpointer v0.20.1 // indirect
+	github.com/go-openapi/jsonreference v0.20.3 // indirect
+	github.com/go-openapi/loads v0.21.3 // indirect
 	github.com/go-openapi/runtime v0.26.0 // indirect
-	github.com/go-openapi/spec v0.20.8 // indirect
-	github.com/go-openapi/swag v0.22.4 // indirect
-	github.com/go-openapi/validate v0.22.1 // indirect
+	github.com/go-openapi/spec v0.20.12 // indirect
+	github.com/go-openapi/swag v0.22.5 // indirect
+	github.com/go-openapi/validate v0.22.4 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.19.0 // indirect
@@ -124,7 +125,6 @@ require (
 	k8s.io/controller-manager v0.30.3 // indirect
 	k8s.io/kms v0.30.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
-	k8s.io/utils v0.0.0-20230726121419-3b25d923346b // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.29.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
