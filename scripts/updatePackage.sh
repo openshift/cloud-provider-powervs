@@ -51,10 +51,7 @@ echo "Clone the source repo: ${SOURCE_REPO} ..."
 git clone --depth=1 --single-branch --branch "${RELEASE}" "https://${GHE_USER}:${GHE_TOKEN}@${SOURCE_REPO}.git"
 
 # Determine commit of the source repo
-SOURCE_COMMIT=$(
-    cd "${REPO_BASE}"
-    git rev-parse --short HEAD
-)
+SOURCE_COMMIT=$(cd "${REPO_BASE}"; git rev-parse --short HEAD)
 
 # Copy over the source files
 echo "Copy over the package files ..."
@@ -126,13 +123,13 @@ if [ "${UPDATE_GO_MOD}" == "true" ]; then
 
     # Add necessary replace directives to the end of the go.mod file
     if [ -n "${GO_MOD_REPLACE_1}" ]; then
-        echo "replace ${GO_MOD_REPLACE_1}" >>go.mod
+        echo "replace ${GO_MOD_REPLACE_1}" >> go.mod
     fi
     if [ -n "${GO_MOD_REPLACE_2}" ]; then
-        echo "replace ${GO_MOD_REPLACE_2}" >>go.mod
+        echo "replace ${GO_MOD_REPLACE_2}" >> go.mod
     fi
     if [ -n "${GO_MOD_REPLACE_3}" ]; then
-        echo "replace ${GO_MOD_REPLACE_3}" >>go.mod
+        echo "replace ${GO_MOD_REPLACE_3}" >> go.mod
     fi
 
     # Delete the go.mod from the source repo, no longer needed
