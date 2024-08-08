@@ -1,14 +1,12 @@
 module cloud.ibm.com/cloud-provider-ibm
 
-go 1.22.0
-
-toolchain go1.22.2
+go 1.22.5
 
 require (
 	github.com/IBM-Cloud/power-go-client v1.7.0
 	github.com/IBM/go-sdk-core/v5 v5.17.4
-	github.com/IBM/platform-services-go-sdk v0.65.0
-	github.com/IBM/vpc-go-sdk v0.55.0
+	github.com/IBM/platform-services-go-sdk v0.65.1
+	github.com/IBM/vpc-go-sdk v0.56.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-openapi/strfmt v0.23.0
 	github.com/spf13/cobra v1.8.1
