@@ -120,9 +120,7 @@ var newPowerVSSdkClient = func(provider *Provider) (Client, error) {
 	client := &powerVSClient{}
 	if provider.PowerVSCloudInstanceID == "" {
 		rcOptions := &rc.ResourceControllerV2Options{
-			Authenticator: &core.IamAuthenticator{
-				ApiKey: credential,
-			},
+			Authenticator: authenticator,
 		}
 		// If the resource controller endpoint override was specified in the config, update the URL
 		if provider.RcEndpointOverride != "" {
