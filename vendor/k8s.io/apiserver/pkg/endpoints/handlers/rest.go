@@ -38,16 +38,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	requestmetrics "k8s.io/apiserver/pkg/endpoints/handlers/metrics"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 )
 
@@ -91,7 +89,7 @@ type RequestScope struct {
 	EquivalentResourceMapper runtime.EquivalentResourceMapper
 
 	TableConvertor rest.TableConvertor
-	FieldManager   *fieldmanager.FieldManager
+	FieldManager   *managedfields.FieldManager
 
 	Resource schema.GroupVersionResource
 	Kind     schema.GroupVersionKind
@@ -191,8 +189,7 @@ func ConnectResource(connecter rest.Connecter, scope *RequestScope, admit admiss
 		}
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
-		ae := audit.AuditEventFrom(ctx)
-		admit = admission.WithAudit(admit, ae)
+		admit = admission.WithAudit(admit)
 
 		opts, subpath, subpathKey := connecter.NewConnectOptions()
 		if err := getRequestOptions(req, scope, opts, subpath, subpathKey, isSubresource); err != nil {
@@ -238,7 +235,7 @@ type responder struct {
 }
 
 func (r *responder) Object(statusCode int, obj runtime.Object) {
-	responsewriters.WriteObjectNegotiated(r.scope.Serializer, r.scope, r.scope.Kind.GroupVersion(), r.w, r.req, statusCode, obj)
+	responsewriters.WriteObjectNegotiated(r.scope.Serializer, r.scope, r.scope.Kind.GroupVersion(), r.w, r.req, statusCode, obj, false)
 }
 
 func (r *responder) Error(err error) {
@@ -356,16 +353,6 @@ func dedupOwnerReferencesAndAddWarning(obj runtime.Object, requestContext contex
 	}
 }
 
-// ensureNonNilItems ensures that for empty lists we don't return <nil> items.
-func ensureNonNilItems(obj runtime.Object) error {
-	if meta.IsListType(obj) && meta.LenList(obj) == 0 {
-		if err := meta.SetList(obj, []runtime.Object{}); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func summarizeData(data []byte, maxLength int) string {
 	switch {
 	case len(data) == 0:
@@ -402,19 +389,25 @@ func limitedReadBody(req *http.Request, limit int64) ([]byte, error) {
 	return data, nil
 }
 
+func limitedReadBodyWithRecordMetric(ctx context.Context, req *http.Request, limit int64, resourceGroup string, verb requestmetrics.RequestBodyVerb) ([]byte, error) {
+	readBody, err := limitedReadBody(req, limit)
+	if err == nil {
+		// only record if we've read successfully
+		requestmetrics.RecordRequestBodySize(ctx, resourceGroup, verb, len(readBody))
+	}
+	return readBody, err
+}
+
 func isDryRun(url *url.URL) bool {
 	return len(url.Query()["dryRun"]) != 0
 }
 
 // fieldValidation checks that the field validation feature is enabled
 // and returns a valid directive of either
-// - Ignore (default when feature is disabled)
-// - Warn (default when feature is enabled)
+// - Ignore
+// - Warn (default)
 // - Strict
 func fieldValidation(directive string) string {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideFieldValidation) {
-		return metav1.FieldValidationIgnore
-	}
 	if directive == "" {
 		return metav1.FieldValidationWarn
 	}
