@@ -113,18 +113,6 @@ type Provider struct {
 	IKSPrivateEndpointHostname string `gcfg:"iksPrivateEndpointHostname"`
 	// File containing cloud credentials both for Classic and VPC
 	CloudCredentials string `gcfg:"cloudCredentials"`
-	// Optional: PowerVS endpoint override URL
-	PowerVSEndpointOverride string `gcfg:"powerVSEndpointOverride"`
-	// Optional: Resource Controller endpoint override URL
-	RcEndpointOverride string `gcfg:"rcEndpointOverride"`
-	// PowerVSCloudInstanceID is IBM Power VS service instance id
-	PowerVSCloudInstanceID string `gcfg:"powerVSCloudInstanceID"`
-	// PowerVSCloudInstanceName is IBM Power VS service instance name
-	PowerVSCloudInstanceName string `gcfg:"powerVSCloudInstanceName"`
-	// PowerVSRegion is IBM Power VS service region
-	PowerVSRegion string `gcfg:"powerVSRegion"`
-	// PowerVSZone is IBM Power VS service zone
-	PowerVSZone string `gcfg:"powerVSZone"`
 }
 
 // CloudConfig is the ibm cloud provider config data.
@@ -305,7 +293,7 @@ func NewCloud(config io.Reader) (cloudprovider.Interface, error) {
 		_, err := c.InitCloudVpc(shouldPrivateEndpointBeEnabled())
 		if err != nil {
 			errString := fmt.Sprintf("Failed initializing VPC: %v", err)
-			klog.Warningf(errString)
+			klog.Warning(errString)
 		}
 	} else {
 		// Initialize the classic logic

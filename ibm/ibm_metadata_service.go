@@ -1,6 +1,6 @@
 /*******************************************************************************
 * IBM Cloud Kubernetes Service, 5737-D43
-* (C) Copyright IBM Corp. 2019, 2022, 2023, 2024 All Rights Reserved.
+* (C) Copyright IBM Corp. 2019, 2024 All Rights Reserved.
 *
 * SPDX-License-Identifier: Apache2.0
 *
@@ -53,7 +53,6 @@ type MetadataService struct {
 	provider       Provider
 	kubeClient     kubernetes.Interface
 	vpcClient      *vpcClient
-	powerVSClient  *ibmPowerVSClient
 	nodeMap        map[string]NodeMetadata
 	nodeMapMux     sync.Mutex
 	nodeCacheStart time.Time
@@ -202,38 +201,21 @@ func (ms *MetadataService) GetNodeMetadata(name string, applyNetworkUnavailable 
 		ms.putCachedNode(name, newNode)
 		return newNode, nil
 	} else if isProviderVpc(ms.provider.ProviderType) {
-		if isProviderPowerVS(ms.provider) {
-			klog.Infof("Retrieving information for node=" + name + " from Power VS ")
-			if ms.powerVSClient == nil {
-				ms.powerVSClient, err = newPowerVSClient(&ms.provider)
-				if err != nil {
-					klog.Errorf("Failed to create new PowerVS client Error: %v", err)
-					return node, err
-				}
-			}
-			// gather node information from Power VS
-			err = ms.powerVSClient.populateNodeMetadata(name, &newNode)
-			if err != nil {
-				klog.Errorf("Failed to populate metadata for PowerVS node %s Error: %v", name, err)
-				return node, err
-			}
-		} else {
-			// labels were not set; if VPC we can try to call api for values
-			klog.Infof("Retrieving information for node=" + name + " from VPC")
+		// labels were not set; if VPC we can try to call api for values
+		klog.Infof("Retrieving information for node=%s from VPC", name)
 
-			// create vpcClient if we haven't already
-			if ms.vpcClient == nil {
-				ms.vpcClient, err = newVpcClient(ms.provider)
-				if err != nil {
-					return node, err
-				}
-			}
-
-			// gather node information from VPC
-			err = ms.vpcClient.populateNodeMetadata(name, &newNode)
+		// create vpcClient if we haven't already
+		if ms.vpcClient == nil {
+			ms.vpcClient, err = newVpcClient(ms.provider)
 			if err != nil {
 				return node, err
 			}
+		}
+
+		// gather node information from VPC
+		err = ms.vpcClient.populateNodeMetadata(name, &newNode)
+		if err != nil {
+			return node, err
 		}
 
 		ms.putCachedNode(name, newNode)
