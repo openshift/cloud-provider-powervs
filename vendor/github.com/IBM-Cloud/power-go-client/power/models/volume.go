@@ -7,6 +7,7 @@ package models
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/go-openapi/errors"
 	"github.com/go-openapi/strfmt"
@@ -19,7 +20,13 @@ import (
 // swagger:model Volume
 type Volume struct {
 
-	// Indicates if the volume is the server's boot volume
+	// Auxiliary volume name at storage host level
+	AuxVolumeName string `json:"auxVolumeName,omitempty"`
+
+	// true if volume is auxiliary otherwise false
+	Auxiliary *bool `json:"auxiliary,omitempty"`
+
+	// Indicates if the volume is the server's boot volume. Only returned when querying a server's attached volumes
 	BootVolume *bool `json:"bootVolume,omitempty"`
 
 	// Indicates if the volume is boot capable
@@ -33,32 +40,61 @@ type Volume struct {
 	// Format: date-time
 	CreationDate *strfmt.DateTime `json:"creationDate"`
 
-	// Indicates if the volume should be deleted when the server terminates
+	// crn
+	Crn CRN `json:"crn,omitempty"`
+
+	// Indicates if the volume should be deleted when the server terminates. Only returned when querying a server's attached volumes
 	DeleteOnTermination *bool `json:"deleteOnTermination,omitempty"`
 
 	// Type of Disk
 	DiskType string `json:"diskType,omitempty"`
 
+	// Freeze time of remote copy relationship
+	// Format: date-time
+	FreezeTime *strfmt.DateTime `json:"freezeTime,omitempty"`
+
 	// Volume Group ID
 	GroupID string `json:"groupID,omitempty"`
+
+	// Amount of iops assigned to the volume
+	IoThrottleRate string `json:"ioThrottleRate,omitempty"`
 
 	// Last Update Date
 	// Required: true
 	// Format: date-time
 	LastUpdateDate *strfmt.DateTime `json:"lastUpdateDate"`
 
-	// mirroring state for replication enabled volume
+	// Master volume name at storage host level
+	MasterVolumeName string `json:"masterVolumeName,omitempty"`
+
+	// Mirroring state for replication enabled volume
 	MirroringState string `json:"mirroringState,omitempty"`
 
 	// Volume Name
 	// Required: true
 	Name *string `json:"name"`
 
+	// true if volume does not exist on storage controller, as volume has been deleted by deleting its paired volume from the mapped replication site.
+	OutOfBandDeleted bool `json:"outOfBandDeleted,omitempty"`
+
+	// indicates whether master/aux volume is playing the primary role
+	// Enum: ["master","aux"]
+	PrimaryRole string `json:"primaryRole,omitempty"`
+
 	// List of PCloud PVM Instance attached to the volume
 	PvmInstanceIDs []string `json:"pvmInstanceIDs"`
 
-	// shows the replication status of a volume
+	// True if volume is replication enabled otherwise false
+	ReplicationEnabled *bool `json:"replicationEnabled,omitempty"`
+
+	// List of replication site for volume replication
+	ReplicationSites []string `json:"replicationSites,omitempty"`
+
+	// Replication status of a volume
 	ReplicationStatus string `json:"replicationStatus,omitempty"`
+
+	// type of replication(metro,global)
+	ReplicationType string `json:"replicationType,omitempty"`
 
 	// Indicates if the volume is shareable between VMs
 	Shareable *bool `json:"shareable,omitempty"`
@@ -69,6 +105,9 @@ type Volume struct {
 
 	// Volume State
 	State string `json:"state,omitempty"`
+
+	// user tags
+	UserTags Tags `json:"userTags,omitempty"`
 
 	// Volume ID
 	// Required: true
@@ -92,6 +131,14 @@ func (m *Volume) Validate(formats strfmt.Registry) error {
 		res = append(res, err)
 	}
 
+	if err := m.validateCrn(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateFreezeTime(formats); err != nil {
+		res = append(res, err)
+	}
+
 	if err := m.validateLastUpdateDate(formats); err != nil {
 		res = append(res, err)
 	}
@@ -100,7 +147,15 @@ func (m *Volume) Validate(formats strfmt.Registry) error {
 		res = append(res, err)
 	}
 
+	if err := m.validatePrimaryRole(formats); err != nil {
+		res = append(res, err)
+	}
+
 	if err := m.validateSize(formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.validateUserTags(formats); err != nil {
 		res = append(res, err)
 	}
 
@@ -121,6 +176,35 @@ func (m *Volume) validateCreationDate(formats strfmt.Registry) error {
 	}
 
 	if err := validate.FormatOf("creationDate", "body", "date-time", m.CreationDate.String(), formats); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Volume) validateCrn(formats strfmt.Registry) error {
+	if swag.IsZero(m.Crn) { // not required
+		return nil
+	}
+
+	if err := m.Crn.Validate(formats); err != nil {
+		if ve, ok := err.(*errors.Validation); ok {
+			return ve.ValidateName("crn")
+		} else if ce, ok := err.(*errors.CompositeError); ok {
+			return ce.ValidateName("crn")
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (m *Volume) validateFreezeTime(formats strfmt.Registry) error {
+	if swag.IsZero(m.FreezeTime) { // not required
+		return nil
+	}
+
+	if err := validate.FormatOf("freezeTime", "body", "date-time", m.FreezeTime.String(), formats); err != nil {
 		return err
 	}
 
@@ -149,9 +233,68 @@ func (m *Volume) validateName(formats strfmt.Registry) error {
 	return nil
 }
 
+var volumeTypePrimaryRolePropEnum []interface{}
+
+func init() {
+	var res []string
+	if err := json.Unmarshal([]byte(`["master","aux"]`), &res); err != nil {
+		panic(err)
+	}
+	for _, v := range res {
+		volumeTypePrimaryRolePropEnum = append(volumeTypePrimaryRolePropEnum, v)
+	}
+}
+
+const (
+
+	// VolumePrimaryRoleMaster captures enum value "master"
+	VolumePrimaryRoleMaster string = "master"
+
+	// VolumePrimaryRoleAux captures enum value "aux"
+	VolumePrimaryRoleAux string = "aux"
+)
+
+// prop value enum
+func (m *Volume) validatePrimaryRoleEnum(path, location string, value string) error {
+	if err := validate.EnumCase(path, location, value, volumeTypePrimaryRolePropEnum, true); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (m *Volume) validatePrimaryRole(formats strfmt.Registry) error {
+	if swag.IsZero(m.PrimaryRole) { // not required
+		return nil
+	}
+
+	// value enum
+	if err := m.validatePrimaryRoleEnum("primaryRole", "body", m.PrimaryRole); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (m *Volume) validateSize(formats strfmt.Registry) error {
 
 	if err := validate.Required("size", "body", m.Size); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Volume) validateUserTags(formats strfmt.Registry) error {
+	if swag.IsZero(m.UserTags) { // not required
+		return nil
+	}
+
+	if err := m.UserTags.Validate(formats); err != nil {
+		if ve, ok := err.(*errors.Validation); ok {
+			return ve.ValidateName("userTags")
+		} else if ce, ok := err.(*errors.CompositeError); ok {
+			return ce.ValidateName("userTags")
+		}
 		return err
 	}
 
@@ -167,8 +310,53 @@ func (m *Volume) validateVolumeID(formats strfmt.Registry) error {
 	return nil
 }
 
-// ContextValidate validates this volume based on context it is used
+// ContextValidate validate this volume based on the context it is used
 func (m *Volume) ContextValidate(ctx context.Context, formats strfmt.Registry) error {
+	var res []error
+
+	if err := m.contextValidateCrn(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if err := m.contextValidateUserTags(ctx, formats); err != nil {
+		res = append(res, err)
+	}
+
+	if len(res) > 0 {
+		return errors.CompositeValidationError(res...)
+	}
+	return nil
+}
+
+func (m *Volume) contextValidateCrn(ctx context.Context, formats strfmt.Registry) error {
+
+	if swag.IsZero(m.Crn) { // not required
+		return nil
+	}
+
+	if err := m.Crn.ContextValidate(ctx, formats); err != nil {
+		if ve, ok := err.(*errors.Validation); ok {
+			return ve.ValidateName("crn")
+		} else if ce, ok := err.(*errors.CompositeError); ok {
+			return ce.ValidateName("crn")
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (m *Volume) contextValidateUserTags(ctx context.Context, formats strfmt.Registry) error {
+
+	if err := m.UserTags.ContextValidate(ctx, formats); err != nil {
+		if ve, ok := err.(*errors.Validation); ok {
+			return ve.ValidateName("userTags")
+		} else if ce, ok := err.(*errors.CompositeError); ok {
+			return ce.ValidateName("userTags")
+		}
+		return err
+	}
+
 	return nil
 }
 

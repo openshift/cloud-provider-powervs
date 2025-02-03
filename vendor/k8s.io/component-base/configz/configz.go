@@ -18,25 +18,26 @@ limitations under the License.
 //
 // Each component that wants to serve its ComponentConfig creates a Config
 // object, and the program should call InstallHandler once. e.g.,
-//  func main() {
-//  	boatConfig := getBoatConfig()
-//  	planeConfig := getPlaneConfig()
 //
-//  	bcz, err := configz.New("boat")
-//  	if err != nil {
-//  		panic(err)
-//  	}
-//  	bcz.Set(boatConfig)
+//	func main() {
+//		boatConfig := getBoatConfig()
+//		planeConfig := getPlaneConfig()
 //
-//  	pcz, err := configz.New("plane")
-//  	if err != nil {
-//  		panic(err)
-//  	}
-//  	pcz.Set(planeConfig)
+//		bcz, err := configz.New("boat")
+//		if err != nil {
+//			panic(err)
+//		}
+//		bcz.Set(boatConfig)
 //
-//  	configz.InstallHandler(http.DefaultServeMux)
-//  	http.ListenAndServe(":8080", http.DefaultServeMux)
-//  }
+//		pcz, err := configz.New("plane")
+//		if err != nil {
+//			panic(err)
+//		}
+//		pcz.Set(planeConfig)
+//
+//		configz.InstallHandler(http.DefaultServeMux)
+//		http.ListenAndServe(":8080", http.DefaultServeMux)
+//	}
 package configz
 
 import (
@@ -45,6 +46,8 @@ import (
 	"net/http"
 	"sync"
 )
+
+const DefaultConfigzPath = "/configz"
 
 var (
 	configsGuard sync.RWMutex
@@ -60,7 +63,7 @@ type Config struct {
 // InstallHandler adds an HTTP handler on the given mux for the "/configz"
 // endpoint which serves all registered ComponentConfigs in JSON format.
 func InstallHandler(m mux) {
-	m.Handle("/configz", http.HandlerFunc(handle))
+	m.Handle(DefaultConfigzPath, http.HandlerFunc(handle))
 }
 
 type mux interface {
