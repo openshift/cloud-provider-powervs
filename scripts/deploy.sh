@@ -1,7 +1,7 @@
 #!/bin/bash
 # ******************************************************************************
 # IBM Cloud Kubernetes Service, 5737-D43
-# (C) Copyright IBM Corp. 2019, 2024 All Rights Reserved.
+# (C) Copyright IBM Corp. 2019, 2025 All Rights Reserved.
 #
 # SPDX-License-Identifier: Apache2.0
 #
@@ -131,7 +131,7 @@ if [[ "${DOCKER_IMAGE_TAG}" = dev-* ]]; then
 else
     kube_branch="release-${kube_major}.${kube_minor}"
     pr_option=""
-    pr_labels="pull-request-ready"
+    pr_labels="pull-request-ready,run-roks-pr-tests"
     {
         echo "Update ${image_name} to ${new_image_tag}"
         echo
