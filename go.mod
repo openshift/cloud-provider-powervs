@@ -7,7 +7,7 @@ toolchain go1.24.1
 require (
 	github.com/IBM/go-sdk-core/v5 v5.19.0
 	github.com/IBM/platform-services-go-sdk v0.79.0
-	github.com/IBM/vpc-go-sdk v0.64.1
+	github.com/IBM/vpc-go-sdk v0.66.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-openapi/strfmt v0.23.0
 	github.com/spf13/cobra v1.9.1
