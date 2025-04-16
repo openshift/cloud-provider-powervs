@@ -1,25 +1,23 @@
 module cloud.ibm.com/cloud-provider-ibm
 
-go 1.24.0
-
-toolchain go1.24.1
+go 1.24.1
 
 require (
 	github.com/IBM/go-sdk-core/v5 v5.19.0
 	github.com/IBM/platform-services-go-sdk v0.79.0
-	github.com/IBM/vpc-go-sdk v0.66.0
+	github.com/IBM/vpc-go-sdk v0.67.1
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-openapi/strfmt v0.23.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
 	gopkg.in/gcfg.v1 v1.2.3
-	k8s.io/api v0.33.0-beta.0
-	k8s.io/apimachinery v0.33.0-beta.0
-	k8s.io/client-go v0.33.0-beta.0
-	k8s.io/cloud-provider v0.33.0-beta.0
-	k8s.io/component-base v0.33.0-beta.0
-	k8s.io/component-helpers v0.33.0-beta.0
+	k8s.io/api v0.33.0-rc.0
+	k8s.io/apimachinery v0.33.0-rc.0
+	k8s.io/client-go v0.33.0-rc.0
+	k8s.io/cloud-provider v0.33.0-rc.0
+	k8s.io/component-base v0.33.0-rc.0
+	k8s.io/component-helpers v0.33.0-rc.0
 	k8s.io/klog/v2 v2.130.1
 )
 
@@ -80,9 +78,9 @@ require (
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	go.etcd.io/etcd/api/v3 v3.5.16 // indirect
-	go.etcd.io/etcd/client/pkg/v3 v3.5.16 // indirect
-	go.etcd.io/etcd/client/v3 v3.5.16 // indirect
+	go.etcd.io/etcd/api/v3 v3.5.21 // indirect
+	go.etcd.io/etcd/client/pkg/v3 v3.5.21 // indirect
+	go.etcd.io/etcd/client/v3 v3.5.21 // indirect
 	go.mongodb.org/mongo-driver v1.17.2 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.58.0 // indirect
@@ -98,7 +96,7 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
-	golang.org/x/net v0.37.0 // indirect
+	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect
 	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
@@ -115,10 +113,10 @@ require (
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiserver v0.33.0-beta.0 // indirect
-	k8s.io/controller-manager v0.33.0-beta.0 // indirect
-	k8s.io/kms v0.33.0-beta.0 // indirect
-	k8s.io/kube-openapi v0.0.0-20250304201544-e5f78fe3ede9 // indirect
+	k8s.io/apiserver v0.33.0-rc.0 // indirect
+	k8s.io/controller-manager v0.33.0-rc.0 // indirect
+	k8s.io/kms v0.33.0-rc.0 // indirect
+	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
