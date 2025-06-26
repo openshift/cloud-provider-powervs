@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -54,6 +55,7 @@ func newDynamicRequestHeaderController(client kubernetes.Interface) (*DynamicReq
 		authenticationConfigMapNamespace,
 		client,
 		"requestheader-username-headers",
+		"requestheader-uid-headers",
 		"requestheader-group-headers",
 		"requestheader-extra-headers-prefix",
 		"requestheader-allowed-names",
@@ -64,15 +66,15 @@ func newDynamicRequestHeaderController(client kubernetes.Interface) (*DynamicReq
 	}, nil
 }
 
-func (c *DynamicRequestHeaderController) RunOnce() error {
+func (c *DynamicRequestHeaderController) RunOnce(ctx context.Context) error {
 	errs := []error{}
-	errs = append(errs, c.ConfigMapCAController.RunOnce())
-	errs = append(errs, c.RequestHeaderAuthRequestController.RunOnce())
+	errs = append(errs, c.ConfigMapCAController.RunOnce(ctx))
+	errs = append(errs, c.RequestHeaderAuthRequestController.RunOnce(ctx))
 	return errors.NewAggregate(errs)
 }
 
-func (c *DynamicRequestHeaderController) Run(workers int, stopCh <-chan struct{}) {
-	go c.ConfigMapCAController.Run(workers, stopCh)
-	go c.RequestHeaderAuthRequestController.Run(workers, stopCh)
-	<-stopCh
+func (c *DynamicRequestHeaderController) Run(ctx context.Context, workers int) {
+	go c.ConfigMapCAController.Run(ctx, workers)
+	go c.RequestHeaderAuthRequestController.Run(ctx, workers)
+	<-ctx.Done()
 }

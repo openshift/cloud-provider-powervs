@@ -22,43 +22,62 @@ import (
 
 // APIResourceConfigSource is the interface to determine which groups and versions are enabled
 type APIResourceConfigSource interface {
-	VersionEnabled(version schema.GroupVersion) bool
 	ResourceEnabled(resource schema.GroupVersionResource) bool
 	AnyResourceForGroupEnabled(group string) bool
+	ResourceExplicitlyEnabled(resource schema.GroupVersionResource) bool
+	VersionExplicitlyEnabled(version schema.GroupVersion) bool
 }
 
 var _ APIResourceConfigSource = &ResourceConfig{}
 
 type ResourceConfig struct {
-	GroupVersionConfigs map[schema.GroupVersion]bool
-	ResourceConfigs     map[schema.GroupVersionResource]bool
+	GroupVersionConfigs         map[schema.GroupVersion]bool
+	ResourceConfigs             map[schema.GroupVersionResource]bool
+	ExplicitGroupVersionConfigs map[schema.GroupVersion]bool
+	ExplicitResourceConfigs     map[schema.GroupVersionResource]bool
 }
 
 func NewResourceConfig() *ResourceConfig {
-	return &ResourceConfig{GroupVersionConfigs: map[schema.GroupVersion]bool{}, ResourceConfigs: map[schema.GroupVersionResource]bool{}}
+	return &ResourceConfig{
+		GroupVersionConfigs:         map[schema.GroupVersion]bool{},
+		ResourceConfigs:             map[schema.GroupVersionResource]bool{},
+		ExplicitGroupVersionConfigs: map[schema.GroupVersion]bool{},
+		ExplicitResourceConfigs:     map[schema.GroupVersionResource]bool{},
+	}
 }
 
-// DisableMatchingVersions disables all group/versions for which the matcher function returns true. It does not modify individual resource enablement/disablement.
+// DisableMatchingVersions disables all group/versions for which the matcher function returns true.
+// This will remove any preferences previously set on individual resources.
 func (o *ResourceConfig) DisableMatchingVersions(matcher func(gv schema.GroupVersion) bool) {
-	for k := range o.GroupVersionConfigs {
-		if matcher(k) {
-			o.GroupVersionConfigs[k] = false
+	for version := range o.GroupVersionConfigs {
+		if matcher(version) {
+			o.GroupVersionConfigs[version] = false
+			o.removeMatchingResourcePreferences(resourceMatcherForVersion(version))
 		}
 	}
 }
 
-// EnableMatchingVersions enables all group/versions for which the matcher function returns true. It does not modify individual resource enablement/disablement.
+// EnableMatchingVersions enables all group/versions for which the matcher function returns true.
+// This will remove any preferences previously set on individual resources.
 func (o *ResourceConfig) EnableMatchingVersions(matcher func(gv schema.GroupVersion) bool) {
-	for k := range o.GroupVersionConfigs {
-		if matcher(k) {
-			o.GroupVersionConfigs[k] = true
+	for version := range o.GroupVersionConfigs {
+		if matcher(version) {
+			o.GroupVersionConfigs[version] = true
+			o.removeMatchingResourcePreferences(resourceMatcherForVersion(version))
 		}
 	}
 }
 
-// RemoveMatchingResourcePreferences removes individual resource preferences that match.  This is useful when an override of a version or level enablement should
+// resourceMatcherForVersion matches resources in the specified version
+func resourceMatcherForVersion(gv schema.GroupVersion) func(gvr schema.GroupVersionResource) bool {
+	return func(gvr schema.GroupVersionResource) bool {
+		return gv == gvr.GroupVersion()
+	}
+}
+
+// removeMatchingResourcePreferences removes individual resource preferences that match.  This is useful when an override of a version or level enablement should
 // override the previously individual preferences.
-func (o *ResourceConfig) RemoveMatchingResourcePreferences(matcher func(gvr schema.GroupVersionResource) bool) {
+func (o *ResourceConfig) removeMatchingResourcePreferences(matcher func(gvr schema.GroupVersionResource) bool) {
 	keysToRemove := []schema.GroupVersionResource{}
 	for k := range o.ResourceConfigs {
 		if matcher(k) {
@@ -67,26 +86,50 @@ func (o *ResourceConfig) RemoveMatchingResourcePreferences(matcher func(gvr sche
 	}
 	for _, k := range keysToRemove {
 		delete(o.ResourceConfigs, k)
+		delete(o.ExplicitResourceConfigs, k)
 	}
 }
 
 // DisableVersions disables the versions entirely.
+// This will remove any preferences previously set on individual resources.
 func (o *ResourceConfig) DisableVersions(versions ...schema.GroupVersion) {
 	for _, version := range versions {
 		o.GroupVersionConfigs[version] = false
+
+		// a preference about a version takes priority over the previously set resources
+		o.removeMatchingResourcePreferences(resourceMatcherForVersion(version))
 	}
 }
 
+func (o *ResourceConfig) ExplicitlyDisableVersions(versions ...schema.GroupVersion) {
+	for _, version := range versions {
+		o.ExplicitGroupVersionConfigs[version] = false
+	}
+	o.DisableVersions(versions...)
+}
+
+// EnableVersions enables all resources in a given groupVersion.
+// This will remove any preferences previously set on individual resources.
 func (o *ResourceConfig) EnableVersions(versions ...schema.GroupVersion) {
 	for _, version := range versions {
 		o.GroupVersionConfigs[version] = true
+
+		// a preference about a version takes priority over the previously set resources
+		o.removeMatchingResourcePreferences(resourceMatcherForVersion(version))
 	}
+
+}
+
+func (o *ResourceConfig) ExplicitlyEnableVersions(versions ...schema.GroupVersion) {
+	for _, version := range versions {
+		o.ExplicitGroupVersionConfigs[version] = true
+	}
+	o.EnableVersions(versions...)
 }
 
 // TODO this must be removed and we enable/disable individual resources.
-func (o *ResourceConfig) VersionEnabled(version schema.GroupVersion) bool {
-	enabled, _ := o.GroupVersionConfigs[version]
-	return enabled
+func (o *ResourceConfig) versionEnabled(version schema.GroupVersion) bool {
+	return o.GroupVersionConfigs[version]
 }
 
 func (o *ResourceConfig) DisableResources(resources ...schema.GroupVersionResource) {
@@ -95,10 +138,24 @@ func (o *ResourceConfig) DisableResources(resources ...schema.GroupVersionResour
 	}
 }
 
+func (o *ResourceConfig) ExplicitlyDisableResources(resources ...schema.GroupVersionResource) {
+	for _, resource := range resources {
+		o.ExplicitResourceConfigs[resource] = false
+	}
+	o.DisableResources(resources...)
+}
+
 func (o *ResourceConfig) EnableResources(resources ...schema.GroupVersionResource) {
 	for _, resource := range resources {
 		o.ResourceConfigs[resource] = true
 	}
+}
+
+func (o *ResourceConfig) ExplicitlyEnableResources(resources ...schema.GroupVersionResource) {
+	for _, resource := range resources {
+		o.ExplicitResourceConfigs[resource] = true
+	}
+	o.EnableResources(resources...)
 }
 
 func (o *ResourceConfig) ResourceEnabled(resource schema.GroupVersionResource) bool {
@@ -108,7 +165,7 @@ func (o *ResourceConfig) ResourceEnabled(resource schema.GroupVersionResource) b
 		return resourceEnabled
 	}
 
-	if !o.VersionEnabled(resource.GroupVersion()) {
+	if !o.versionEnabled(resource.GroupVersion()) {
 		return false
 	}
 	// they are enabled by default.
@@ -118,7 +175,7 @@ func (o *ResourceConfig) ResourceEnabled(resource schema.GroupVersionResource) b
 func (o *ResourceConfig) AnyResourceForGroupEnabled(group string) bool {
 	for version := range o.GroupVersionConfigs {
 		if version.Group == group {
-			if o.VersionEnabled(version) {
+			if o.versionEnabled(version) {
 				return true
 			}
 		}
@@ -129,5 +186,21 @@ func (o *ResourceConfig) AnyResourceForGroupEnabled(group string) bool {
 		}
 	}
 
+	return false
+}
+
+func (o *ResourceConfig) ResourceExplicitlyEnabled(resource schema.GroupVersionResource) bool {
+	resourceEnabled, explicitlySet := o.ExplicitResourceConfigs[resource]
+	if explicitlySet {
+		return resourceEnabled
+	}
+	return false
+}
+
+func (o *ResourceConfig) VersionExplicitlyEnabled(version schema.GroupVersion) bool {
+	versionEnabled, explicitlySet := o.ExplicitGroupVersionConfigs[version]
+	if explicitlySet {
+		return versionEnabled
+	}
 	return false
 }
