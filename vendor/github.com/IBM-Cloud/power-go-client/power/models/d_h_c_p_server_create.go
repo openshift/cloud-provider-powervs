@@ -17,8 +17,23 @@ import (
 // swagger:model DHCPServerCreate
 type DHCPServerCreate struct {
 
+	// Optional cidr for DHCP private network
+	Cidr *string `json:"cidr,omitempty"`
+
 	// Optional cloud connection uuid to connect with DHCP private network
-	CloudConnectionID string `json:"cloudConnectionID,omitempty"`
+	CloudConnectionID *string `json:"cloudConnectionID,omitempty"`
+
+	// Optional DNS Server for DHCP service
+	DNSServer *string `json:"dnsServer,omitempty"`
+
+	// Optional name of DHCP Service. Only alphanumeric characters and dashes are allowed (will be prefixed by DHCP identifier)
+	Name *string `json:"name,omitempty"`
+
+	// Optional network security groups that the DHCP server network interface is a member of. There is a limit of 1 network security group in the array. If not specified, default network security group is used.
+	NetworkSecurityGroupIDs []string `json:"networkSecurityGroupIDs"`
+
+	// Indicates if SNAT will be enabled for DHCP service
+	SnatEnabled *bool `json:"snatEnabled,omitempty"`
 }
 
 // Validate validates this d h c p server create
