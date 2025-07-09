@@ -1,0 +1,51 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Go
+
+on:
+  push:
+    branches: [ "release-1.34" ]
+  pull_request:
+    branches: [ "release-1.34" ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 1.24.x
+
+    - name: Install golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: v1.64.8
+
+    - name: Install ShellCheck
+      run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+    - name: Verify license file
+      run: make oss
+
+    - name: Run fmt
+      run: make fmt
+
+    - name: Run lint
+      run: make lint
+
+    - name: Rnn lint-sh
+      run: make lint-sh
+
+    - name: Rnn vet
+      run: make vet
+
+    - name: Run tests
+      run: make test
+
+    - name: Run commands
+      run: make commands
