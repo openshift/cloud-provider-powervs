@@ -23,7 +23,7 @@ jobs:
       - name: Install golangci-lint (no run)
         uses: golangci/golangci-lint-action@v6
         with:
-          args: --version
+          args: --disable-all --timeout 5m
           version: v1.64.8
 
       - name: Install ShellCheck
