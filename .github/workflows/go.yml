@@ -20,32 +20,29 @@ jobs:
         with:
           go-version: 1.24.x
 
-      - name: Install golangci-lint (no run)
-        uses: golangci/golangci-lint-action@v6
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v6 # v8 available, but only supports >= v2.1.0
         with:
-          args: --disable-all --timeout 5m
+          args: --disable-all --timeout 5m # disable linting, initialize cache
           version: v1.64.8
 
-      - name: Install ShellCheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
-
-      - name: Verify license file
+      - name: Verify LICENSE file
         run: make oss
 
-      - name: Run fmt
+      - name: Run go fmt (via golangci-lint)
         run: make fmt
 
-      - name: Run lint
+      - name: Run lint (via golangci-lint)
         run: make lint
 
-      - name: Rnn lint-sh
+      - name: Rnn lint-sh (via shellcheck)
         run: make lint-sh
 
-      - name: Rnn vet
+      - name: Rnn go vet
         run: make vet
 
-      - name: Run tests
+      - name: Run go test
         run: make test
 
-      - name: Run commands
+      - name: Run go build
         run: make commands
