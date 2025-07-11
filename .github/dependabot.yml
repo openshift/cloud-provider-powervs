@@ -12,9 +12,8 @@ updates:
     open-pull-requests-limit: 99
     groups:
       kubernetes:
-        applies-to: version-updates
         patterns:
-          - "k8s.io*"
+          - "k8s.io/*"
         exclude-patterns:
           - "k8s.io/klog/v2"
           - "k8s.io/kube-openapi"
