@@ -14,9 +14,9 @@ updates:
       kubernetes:
         patterns:
           - "k8s.io/*"
-        exclude-patterns:
-          - "k8s.io/klog/v2"
-          - "k8s.io/kube-openapi"
-          - "k8s.io/utils"
-        update-types:
-          - "patch"
+        # exclude-patterns:
+        #   - "k8s.io/klog/v2"
+        #   - "k8s.io/kube-openapi"
+        #   - "k8s.io/utils"
+        # update-types:
+        #   - "patch"
