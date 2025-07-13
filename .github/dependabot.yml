@@ -17,3 +17,22 @@ updates:
       ibm-sdk:
         patterns:
           - "github.com/IBM/*"
+    labels:
+      - "release-1.34"
+    target-branch: "release-1.34"
+
+  - package-ecosystem: "gomod" # Specifies the Go modules package ecosystem
+    directory: "/" # Location of your go.mod file
+    schedule:
+      interval: "daily" # Checks for updates daily
+    open-pull-requests-limit: 99
+    groups:
+      kubernetes:
+        patterns:
+          - "k8s.io/*"
+      ibm-sdk:
+        patterns:
+          - "github.com/IBM/*"
+    labels:
+      - "release-1.33"
+    target-branch: "release-1.33"
