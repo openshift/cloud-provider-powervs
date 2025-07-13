@@ -11,10 +11,10 @@ updates:
       interval: "daily" # Checks for updates daily
     open-pull-requests-limit: 99
     groups:
-      kubernetes:
+      kubernetes-1.34:
         patterns:
           - "k8s.io/*"
-      ibm-sdk:
+      ibm-sdk-1.34:
         patterns:
           - "github.com/IBM/*"
     labels:
@@ -27,10 +27,10 @@ updates:
       interval: "daily" # Checks for updates daily
     open-pull-requests-limit: 99
     groups:
-      kubernetes:
+      kubernetes-1.33:
         patterns:
           - "k8s.io/*"
-      ibm-sdk:
+      ibm-sdk-1.33:
         patterns:
           - "github.com/IBM/*"
     labels:
