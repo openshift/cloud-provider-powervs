@@ -46,3 +46,22 @@ jobs:
 
       - name: Run go build
         run: make commands
+
+      - name: Install GitHub CLI
+        run: sudo apt-get install gh
+
+      - name: Get PR number for branch
+        id: get-pr
+        run: |
+          PR_JSON=$(gh pr list --head "${{ github.event.client_payload.pr_branch }}" --json number --jq '.[0]')
+          echo "pr_number=${PR_JSON}" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on PR
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ steps.get-pr.outputs.pr_number }}
+          body: |
+            ✅ Tests completed successfully
