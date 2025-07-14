@@ -34,6 +34,11 @@ jobs:
         run: |
           echo "UPDATE_VERSION=$(grep '^TAG ' Makefile | awk '{ print $3 }')" >> $GITHUB_ENV
 
+      - name: No update needed
+        if: env.CURRENT_VERSION == env.UPDATE_VERSION
+        run: |
+          echo "No update needed"
+
       - name: Commit changes
         if: env.CURRENT_VERSION != env.UPDATE_VERSION
         run: |
