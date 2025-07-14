@@ -65,6 +65,6 @@ jobs:
           event-type: pull-request-created
           client-payload: |
             {
-              "pr_branch": ${{ env.UPDATE_VERSION }},
-              "pr_title": ${{ env.COMMIT_MSG }}"
+              "pr_branch": "${{ env.UPDATE_VERSION }}",
+              "pr_title": "${{ env.COMMIT_MSG }}"
             }
