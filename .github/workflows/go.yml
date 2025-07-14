@@ -20,8 +20,6 @@ on:
       - "Makefile"
       - ".golangci.yml"
       - ".github/workflows/go.yml"
-  repository_dispatch:
-    types: [pull-request-created]
   workflow_dispatch: # Allow manual triggering
 
 jobs:
