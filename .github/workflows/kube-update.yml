@@ -51,8 +51,15 @@ jobs:
         if: env.CURRENT_VERSION != env.UPDATE_VERSION
         uses: peter-evans/create-pull-request@v6
         with:
-          title: "${{ env.COMMIT_MSG }}"
-          commit-message: "${{ env.COMMIT_MSG }}"
-          branch: "${{ env.UPDATE_VERSION }}"
-          base: "${{ env.GIT_BRANCH }}"
+          title: ${{ env.COMMIT_MSG }}
+          commit-message: ${{ env.COMMIT_MSG }}
+          branch: ${{ env.UPDATE_VERSION }}
+          base: ${{ env.GIT_BRANCH }}
           delete-branch: true
+
+      - name: Trigger downstream workflow
+        if: env.CURRENT_VERSION != env.UPDATE_VERSION
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: pull-request-created
