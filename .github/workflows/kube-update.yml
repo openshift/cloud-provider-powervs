@@ -53,9 +53,11 @@ jobs:
         with:
           title: ${{ env.COMMIT_MSG }}
           body: |
-            If you do not see:  ✅ Tests completed successfully
-            posted to this PR,
-            check the results [here](https://github.com/IBM-Cloud/cloud-provider-ibm/actions/workflows/kube-update-pr.yml)
+            If you do not see:
+            
+              ✅ Tests completed successfully
+
+            Check the PR results [here](https://github.com/IBM-Cloud/cloud-provider-ibm/actions/workflows/kube-update-pr.yml)
           commit-message: ${{ env.COMMIT_MSG }}
           branch: ${{ env.UPDATE_VERSION }}
           base: ${{ env.GIT_BRANCH }}

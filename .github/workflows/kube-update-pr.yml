@@ -53,8 +53,8 @@ jobs:
       - name: Get PR number for branch
         id: get-pr
         run: |
-          PR_JSON=$(gh pr list --head "${{ github.event.client_payload.pr_branch }}" --json number --jq '.[0]')
-          echo "pr_number=${PR_JSON}" >> "$GITHUB_OUTPUT"
+          PR_NUMBER=$(gh pr list --head "${{ github.event.client_payload.pr_branch }}" --json number --jq '.[0].number')
+          echo "pr_number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
