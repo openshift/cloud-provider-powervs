@@ -45,12 +45,14 @@ jobs:
           commit_msg="Bump branch ${{ env.GIT_BRANCH }} from ${{ env.CURRENT_VERSION }} to ${{ env.UPDATE_VERSION }}"
           echo "COMMIT_MSG=$commit_msg" >> $GITHUB_ENV
           git add -A
-          git commit -m "{{ env.COMMIT_MSG }}"
+          git commit -m "${{ env.COMMIT_MSG }}"
 
       - name: Create pull request
         if: env.CURRENT_VERSION != env.UPDATE_VERSION
         uses: peter-evans/create-pull-request@v6
         with:
+          title: "${{ env.COMMIT_MSG }}"
           commit-message: "${{ env.COMMIT_MSG }}"
           branch: "${{ env.UPDATE_VERSION }}"
           base: "${{ env.GIT_BRANCH }}"
+          delete-branch: true
