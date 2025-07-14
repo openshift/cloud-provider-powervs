@@ -36,3 +36,67 @@ updates:
     labels:
       - "release-1.33"
     target-branch: "release-1.33"
+
+  - package-ecosystem: "gomod" # Specifies the Go modules package ecosystem
+    directory: "/" # Location of your go.mod file
+    schedule:
+      interval: "daily" # Checks for updates daily
+    open-pull-requests-limit: 99
+    groups:
+      kubernetes-1.32:
+        patterns:
+          - "k8s.io/*"
+      ibm-sdk-1.32:
+        patterns:
+          - "github.com/IBM/*"
+    labels:
+      - "release-1.32"
+    target-branch: "release-1.32"
+
+  - package-ecosystem: "gomod" # Specifies the Go modules package ecosystem
+    directory: "/" # Location of your go.mod file
+    schedule:
+      interval: "daily" # Checks for updates daily
+    open-pull-requests-limit: 99
+    groups:
+      kubernetes-1.31:
+        patterns:
+          - "k8s.io/*"
+      ibm-sdk-1.31:
+        patterns:
+          - "github.com/IBM/*"
+    labels:
+      - "release-1.31"
+    target-branch: "release-1.31"
+
+  - package-ecosystem: "gomod" # Specifies the Go modules package ecosystem
+    directory: "/" # Location of your go.mod file
+    schedule:
+      interval: "daily" # Checks for updates daily
+    open-pull-requests-limit: 99
+    groups:
+      kubernetes-1.30:
+        patterns:
+          - "k8s.io/*"
+      ibm-sdk-1.30:
+        patterns:
+          - "github.com/IBM/*"
+    labels:
+      - "release-1.30"
+    target-branch: "release-1.30"
+
+  - package-ecosystem: "gomod" # Specifies the Go modules package ecosystem
+    directory: "/" # Location of your go.mod file
+    schedule:
+      interval: "daily" # Checks for updates daily
+    open-pull-requests-limit: 99
+    groups:
+      kubernetes-1.29:
+        patterns:
+          - "k8s.io/*"
+      ibm-sdk-1.29:
+        patterns:
+          - "github.com/IBM/*"
+    labels:
+      - "release-1.29"
+    target-branch: "release-1.29"
