@@ -58,7 +58,7 @@ if [[ "${MOD_VERSION}" != "v0.${K8S_UPDATE_VERSION#*.}" ]]; then
     exit 0
 fi
 # Ensure that an update for this Kubernetes release was not already started
-if ! git branch --list "$K8S_UPDATE_VERSION"; then
+if git ls-remote --exit-code --heads "origin" "$K8S_UPDATE_VERSION" >/dev/null; then
     echo "INFO: Branch $K8S_UPDATE_VERSION has already been created, exiting gracefully"
     exit 0
 fi
