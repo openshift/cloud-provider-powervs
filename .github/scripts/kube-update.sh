@@ -53,7 +53,12 @@ if [[ "${K8S_UPDATE_VERSION}" == "${K8S_CURRENT_VERSION}" ]]; then
 fi
 # Ensure the go modules have also been updated. i.e. k8s.io/api v0.20.3
 if [[ "${MOD_VERSION}" != "v0.${K8S_UPDATE_VERSION#*.}" ]]; then
-    echo "INFO: New go modules are not yet available, exiting gracefully"
+    echo "INFO: New go modules are not available, exiting gracefully"
+    exit 0
+fi
+# Ensure that an update for this Kubernetes release was not already started
+if ! git branch --list "$K8S_UPDATE_VERSION"; then
+    echo "INFO: Branch $K8S_UPDATE_VERSION has already been created, exiting gracefully"
     exit 0
 fi
 
