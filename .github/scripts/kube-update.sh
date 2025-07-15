@@ -18,6 +18,7 @@
 # limitations under the License.
 # ******************************************************************************
 set -e
+set -x
 
 K8S_CURRENT_VERSION=$(grep "^TAG " Makefile | awk '{ print $3 }')
 if [[ -z "${K8S_CURRENT_VERSION}" ]]; then
