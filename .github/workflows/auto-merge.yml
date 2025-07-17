@@ -17,6 +17,9 @@ jobs:
       contents: write
 
     steps:
+      - name: Dump GitHub context
+        run: echo '${{ toJson(github) }}'
+
       - name: Show PR number
         run: |
           echo "PR: #${{ github.event.pull_request.number }}"
