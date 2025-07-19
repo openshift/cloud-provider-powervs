@@ -71,9 +71,9 @@ jobs:
         if: steps.cur-k8s-ver.outputs.version == steps.new-k8s-ver.outputs.version
         run: |
           echo "No update needed"
+          exit 0
 
       - name: Commit changes
-        if: steps.cur-k8s-ver.outputs.version != steps.new-k8s-ver.outputs.version
         id: commit-change
         run: |
           commit_msg="Bump branch ${{ matrix.branch }} from ${{ steps.cur-k8s-ver.outputs.version }} to ${{ steps.new-k8s-ver.outputs.version }}"
@@ -82,7 +82,6 @@ jobs:
           git commit -m "$commit_msg"
 
       - name: Create pull request
-        if: steps.cur-k8s-ver.outputs.version != steps.new-k8s-ver.outputs.version
         uses: peter-evans/create-pull-request@v6
         with:
           title: ${{ steps.commit-change.outputs.msg }}
@@ -101,7 +100,6 @@ jobs:
           delete-branch: true
 
       - name: Trigger downstream workflow
-        if: steps.cur-k8s-ver.outputs.version != steps.new-k8s-ver.outputs.version
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
