@@ -66,3 +66,10 @@ jobs:
           issue-number: ${{ steps.get-pr.outputs.pr_number }}
           body: |
             ✅ Tests completed successfully
+
+      - name: Enable auto-merge
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          pull-request-number: ${{ steps.get-pr.outputs.pr_number }}
+          merge-method: squash
