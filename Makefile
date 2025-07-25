@@ -27,7 +27,7 @@ GOLANGCI_LINT_EXISTS := $(shell golangci-lint --version 2>/dev/null)
 TAG ?= v1.34.0-alpha.3
 
 .PHONY: all
-all: fmt lint lint-sh vet test controller
+all: fmt lint lint-sh vet test command
 
 .PHONY: fmt
 fmt:
@@ -61,8 +61,8 @@ vet:
 test:
 	go test -v -race -covermode=atomic -coverprofile=cover.out ${GOPACKAGES}
 
-.PHONY: controller
-controller:
+.PHONY: command
+command:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ibm-cloud-controller-manager -ldflags '-w -X cloud.ibm.com/cloud-provider-ibm/ibm.Version=${TAG}' .
 
 .PHONY: clean
