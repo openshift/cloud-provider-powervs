@@ -107,6 +107,8 @@ updates:
       interval: "cron"
       cronjob: "0 5 * * *" # Run at 5:00 UTC daily
     ignore:
+      - dependency-name: "k8s.io/api"
+        update-types: ["version-update:semver-minor"]
       - dependency-name: "k8s.io/apimachinery"
         update-types: ["version-update:semver-minor"]
       - dependency-name: "k8s.io/client-go"
@@ -137,6 +139,8 @@ updates:
       interval: "cron"
       cronjob: "0 4 * * *" # Run at 4:00 UTC daily
     ignore:
+      - dependency-name: "k8s.io/api"
+        update-types: ["version-update:semver-minor"]
       - dependency-name: "k8s.io/apimachinery"
         update-types: ["version-update:semver-minor"]
       - dependency-name: "k8s.io/client-go"
@@ -167,6 +171,8 @@ updates:
       interval: "cron"
       cronjob: "0 3 * * *" # Run at 3:00 UTC daily
     ignore:
+      - dependency-name: "k8s.io/api"
+        update-types: ["version-update:semver-minor"]
       - dependency-name: "k8s.io/apimachinery"
         update-types: ["version-update:semver-minor"]
       - dependency-name: "k8s.io/client-go"
@@ -197,6 +203,8 @@ updates:
       interval: "cron"
       cronjob: "0 2 * * *" # Run at 2:00 UTC daily
     ignore:
+      - dependency-name: "k8s.io/api"
+        update-types: ["version-update:semver-minor"]
       - dependency-name: "k8s.io/apimachinery"
         update-types: ["version-update:semver-minor"]
       - dependency-name: "k8s.io/client-go"
@@ -227,6 +235,8 @@ updates:
       interval: "cron"
       cronjob: "0 1 * * *" # Run at 1:00 UTC daily
     ignore:
+      - dependency-name: "k8s.io/api"
+        update-types: ["version-update:semver-minor"]
       - dependency-name: "k8s.io/apimachinery"
         update-types: ["version-update:semver-minor"]
       - dependency-name: "k8s.io/client-go"
