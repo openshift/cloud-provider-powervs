@@ -1,0 +1,29 @@
+# This workflow will run lint against the yaml github action files
+
+name: Lint YAML Files
+
+on:
+  push:
+    branches:
+      - release-1.34
+  pull_request:
+    branches:
+      - release-1.34
+
+jobs:
+  yamllint:
+    name: Run yamllint
+    runs-on: ubuntu-latest  # Use the latest Ubuntu runner
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4  # Check out the repository code
+
+      - name: Run yamllint
+        uses: karancode/yamllint-github-action@master  # Use the yamllint action
+        with:
+          yamllint_file_or_dir: '.'  # Lint all YAML files in the repository
+          yamllint_strict: true      # Treat warnings as errors
+          yamllint_comment: true     # Post comments on pull requests with linting issues
+        env:
+          GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Required for commenting on PRs
