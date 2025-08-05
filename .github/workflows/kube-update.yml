@@ -56,7 +56,7 @@ jobs:
         run: |
           version=$(grep '^TAG ' Makefile | awk '{ print $3 }')
           echo "version=$version"
-          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Run kube update script for ${{ matrix.branch }}
         run: .github/scripts/kube-update.sh
@@ -66,7 +66,7 @@ jobs:
         run: |
           version=$(grep '^TAG ' Makefile | awk '{ print $3 }')
           echo "version=$version"
-          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: No update needed for ${{ matrix.branch }}
         if: steps.cur-k8s-ver.outputs.version == steps.new-k8s-ver.outputs.version
@@ -78,7 +78,7 @@ jobs:
         id: commit-change
         run: |
           commit_msg="Bump branch ${{ matrix.branch }} from ${{ steps.cur-k8s-ver.outputs.version }} to ${{ steps.new-k8s-ver.outputs.version }}"
-          echo "msg=$commit_msg" >> $GITHUB_OUTPUT
+          echo "msg=$commit_msg" >> "$GITHUB_OUTPUT"
           git add -A
           git commit -m "$commit_msg"
 
