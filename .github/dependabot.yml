@@ -5,10 +5,9 @@
 
 version: 2
 updates:
-
-# ------------------------------------------------------------------------------------------------------------
-# Update the "github-actions" for each of the branches
-# ------------------------------------------------------------------------------------------------------------
+  # ------------------------------------------------------------------------------------------------------------
+  # Update the "github-actions" for each of the branches
+  # ------------------------------------------------------------------------------------------------------------
 
   - package-ecosystem: "github-actions"
     directory: "/" # location of your .github/workflows directory
@@ -122,9 +121,9 @@ updates:
       - dependency-name: "golangci/golangci-lint-action" # Need to use older version
     target-branch: "release-1.27"
 
-# ------------------------------------------------------------------------------------------------------------
-# Update the go modules for each of the branches
-# ------------------------------------------------------------------------------------------------------------
+  # ------------------------------------------------------------------------------------------------------------
+  # Update the go modules for each of the branches
+  # ------------------------------------------------------------------------------------------------------------
 
   - package-ecosystem: "gomod" # Specifies the Go modules package ecosystem
     directory: "/" # Location of your go.mod file

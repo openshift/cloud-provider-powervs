@@ -12,7 +12,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for contribution guidelines.
 
 ## Unit Testing
 
-The [GO Github Action](.github/workflows/go.yml) workflow will run the GO unit tests on pull requests.
+The [GO GitHub Action](.github/workflows/go.yml) workflow will run the GO unit tests on pull requests.
 The GO unit tests can also be invoked locally by running:
 
 `make test`

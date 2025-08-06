@@ -33,4 +33,4 @@ linters-settings: # please keep this alphabetized
   staticcheck:
     checks:
       - "all"
-      - "-SA1019"  # TODO(fix) v1.Endpoints is deprecated: This API is deprecated in v1.33+. Use discoveryv1.EndpointSlice
+      - "-SA1019" # TODO(fix) v1.Endpoints is deprecated: This API is deprecated in v1.33+. Use discoveryv1.EndpointSlice
