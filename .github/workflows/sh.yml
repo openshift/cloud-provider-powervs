@@ -16,7 +16,7 @@ on:
   workflow_dispatch: # Allow manual triggering
 
 jobs:
-  build:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
