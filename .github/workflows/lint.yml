@@ -5,12 +5,14 @@ name: Lint
 on:
   push:
     paths:
+      - "**.md"
       - "**.sh"
       - "**.yml"
     branches:
       - release-1.34
   pull_request:
     paths:
+      - "**.md"
       - "**.sh"
       - "**.yml"
     branches:
@@ -42,4 +44,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VALIDATE_BASH: true
           VALIDATE_GITHUB_ACTIONS: true
+          VALIDATE_MARKDOWN: true
+          VALIDATE_NATURAL_LANGUAGE: true
           VALIDATE_YAML: true
