@@ -1,6 +1,6 @@
 # This workflow will run actionLint against github workflows
 
-name: Lint GitHub Actions workflows
+name: GitHub Actions Lint
 
 on:
   push:

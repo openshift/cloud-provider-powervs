@@ -1,6 +1,6 @@
 # This workflow will run shellcheck against script files
 
-name: Sh
+name: Shellcheck Lint
 
 on:
   push:
