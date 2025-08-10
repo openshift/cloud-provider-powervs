@@ -46,7 +46,7 @@ jobs:
         run: make test
 
       - name: Run go build
-        run: make commands
+        run: make ccm
 
       - name: Install GitHub CLI
         run: sudo apt-get install gh
