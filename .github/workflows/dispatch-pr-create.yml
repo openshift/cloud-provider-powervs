@@ -28,7 +28,7 @@ jobs:
 
       - name: Install golangci-lint v1
         if: startsWith(steps.get-ver.outputs.golangci_version, '1')
-        uses: golangci/golangci-lint-action@55c2c14 # SHA for v6.5.2
+        uses: golangci/golangci-lint-action@55c2c1448f86e01eaae002a5a3a9624417608d84 # SHA for v6.5.2
         with:
           args: --disable-all --timeout 5m # disable linting, initialize cache
           version: ${{ steps.get-ver.outputs.golangci_version }}
