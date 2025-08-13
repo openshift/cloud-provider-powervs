@@ -1,14 +1,13 @@
-# This workflow will build a golang project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+# This workflow will get invoked via "repository_dispatch" and it is based on the Go Lint/Test/Build (go.yml) workflow
 
-name: Kube update PR
+name: Dispatch PR create
 
 on:
   repository_dispatch:
     types: [pull-request-created]
 
 jobs:
-  kube-update-pr:
+  dispatch-pr-create:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -27,7 +26,15 @@ jobs:
         with:
           go-version: ${{ steps.get-ver.outputs.go_version }}
 
-      - name: Install golangci-lint
+      - name: Install golangci-lint v1
+        if: startsWith(${{ steps.get-ver.outputs.golangci_version }}, '1')
+        uses: golangci/golangci-lint-action@55c2c14 # SHA for v6.5.2
+        with:
+          args: --disable-all --timeout 5m # disable linting, initialize cache
+          version: ${{ steps.get-ver.outputs.golangci_version }}
+
+      - name: Install golangci-lint v2
+        if: startsWith(${{ steps.get-ver.outputs.golangci_version }}, '2')
         uses: golangci/golangci-lint-action@v8
         with:
           version: ${{ steps.get-ver.outputs.golangci_version }}
