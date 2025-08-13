@@ -92,7 +92,7 @@ jobs:
 
               ✅ Tests completed successfully
 
-            Check the PR results [here](https://github.com/IBM-Cloud/cloud-provider-ibm/actions/workflows/kube-update-pr.yml)
+            Check the PR results [here](https://github.com/IBM-Cloud/cloud-provider-ibm/actions/workflows/dispatch-pr-create.yml)
           commit-message: ${{ steps.commit-change.outputs.msg }}
           branch: ${{ steps.new-k8s-ver.outputs.version }}
           base: ${{ matrix.branch }}
