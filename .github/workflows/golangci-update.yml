@@ -64,7 +64,7 @@ jobs:
 
             Check the PR results [here](https://github.com/IBM-Cloud/cloud-provider-ibm/actions/workflows/dispatch-pr-create.yml)
           commit-message: ${{ steps.commit-change.outputs.msg }}
-          branch: golangci-${{ steps.latest.outputs.version }}
+          branch: golangci-${{ steps.latest.outputs.version }}-${{ matrix.branch }}
           base: ${{ matrix.branch }}
           labels: |
             kube-update
@@ -79,6 +79,6 @@ jobs:
           event-type: pull-request-created
           client-payload: |
             {
-              "pr_branch": "golangci-${{ steps.latest.outputs.version }}",
+              "pr_branch": "golangci-${{ steps.latest.outputs.version }}-${{ matrix.branch }}",
               "pr_title": "${{ steps.commit-change.outputs.msg }}"
             }
