@@ -1,6 +1,6 @@
 # This workflow will check the copyright of GO files
 
-name: Copyright check
+name: Copyright Check
 
 on:
   push:
@@ -39,7 +39,7 @@ jobs:
           # Join files into a single space-separated string
           files="${files//$'\n'/ }"
           echo ".go/.ini files found: $files"
-          
+
           echo "files=$files" >> "$GITHUB_OUTPUT"
 
       - name: Verify copyright notice
