@@ -67,7 +67,7 @@ jobs:
           branch: golangci-${{ steps.latest.outputs.version }}-${{ matrix.branch }}
           base: ${{ matrix.branch }}
           labels: |
-            kube-update
+            golangci-update
             ${{ matrix.branch }}
           delete-branch: true
 
