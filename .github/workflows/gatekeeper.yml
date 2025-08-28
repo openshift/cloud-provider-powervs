@@ -15,7 +15,7 @@ jobs:
         with:
           script: |
             const sha = context.payload.workflow_run.head_sha;
-            const gatekeeperName = "Gatekeeper / gatekeeper"; // workflow name / job name
+            const gatekeeperName = "gatekeeper";
 
             async function getChecks() {
               const { data } = await github.rest.checks.listForRef({
