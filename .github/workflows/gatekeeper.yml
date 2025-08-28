@@ -15,6 +15,7 @@ jobs:
         with:
           script: |
             const sha = context.payload.workflow_run.head_sha;
+            const gatekeeperName = "Gatekeeper / gatekeeper"; // workflow name / job name
 
             async function getChecks() {
               const { data } = await github.rest.checks.listForRef({
@@ -22,7 +23,9 @@ jobs:
                 repo: context.repo.repo,
                 ref: sha,
               });
-              return data.check_runs;
+
+              // Filter out Gatekeeper itself
+              return data.check_runs.filter(c => c.name !== gatekeeperName);
             }
 
             async function waitForChecks(maxAttempts = 20, delayMs = 30000) {
