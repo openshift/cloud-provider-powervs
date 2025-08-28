@@ -1,0 +1,64 @@
+name: Gatekeeper
+
+on:
+  workflow_run:
+    workflows: ["lint", "test", "build"]
+    types:
+      - completed
+
+jobs:
+  gatekeeper:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for all check runs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha = context.payload.workflow_run.head_sha;
+
+            async function getChecks() {
+              const { data } = await github.rest.checks.listForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: sha,
+              });
+              return data.check_runs;
+            }
+
+            async function waitForChecks(maxAttempts = 20, delayMs = 30000) {
+              for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                const checks = await getChecks();
+
+                const pending = checks.filter(c =>
+                  ["queued", "in_progress", "waiting"].includes(c.status)
+                );
+                const failed = checks.filter(c =>
+                  c.status === "completed" && !["success", "skipped"].includes(c.conclusion)
+                );
+
+                console.log(`Attempt ${attempt}:`);
+                checks.forEach(c =>
+                  console.log(`- ${c.name}: status=${c.status}, conclusion=${c.conclusion}`)
+                );
+
+                if (failed.length > 0) {
+                  core.setFailed(`❌ Some checks failed: ${failed.map(c => c.name).join(", ")}`);
+                  return;
+                }
+
+                if (pending.length === 0) {
+                  console.log("✅ All checks succeeded or skipped");
+                  return;
+                }
+
+                if (attempt < maxAttempts) {
+                  console.log(`⏳ Still waiting on: ${pending.map(c => c.name).join(", ")}...`);
+                  await new Promise(r => setTimeout(r, delayMs));
+                } else {
+                  core.setFailed(`⚠️ Timeout: checks never completed: ${pending.map(c => c.name).join(", ")}`);
+                  return;
+                }
+              }
+            }
+
+            await waitForChecks();
