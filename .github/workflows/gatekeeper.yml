@@ -2,7 +2,7 @@ name: Gatekeeper
 
 on:
   workflow_run:
-    workflows: ["lint", "test", "build"]
+    workflows: ["GitHub Actions Lint", "Copyright Check", "Go Lint/Test/Build", "Markdown Lint", "Shellcheck Lint"]
     types:
       - completed
 
