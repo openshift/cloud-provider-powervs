@@ -64,7 +64,11 @@ jobs:
               }
 
               if (!allDone) {
-                console.log("⏳ Some checks still in progress. Retrying in 30s...");
+                // Show which checks are still in progress
+                const inProgress = checks
+                  .filter(c => !c.name.includes('gatekeeper') && c.status !== 'completed')
+                  .map(c => c.name);
+                console.log(`⏳ Waiting for ${inProgress.length} checks: ${inProgress.join(', ')}. Retrying in 30s...`);
                 await new Promise(r => setTimeout(r, 30000));
                 attempts++;
               }
