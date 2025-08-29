@@ -34,7 +34,7 @@ jobs:
 
             function formatCheck(c) {
               const wf = c.check_suite?.name || "UnknownWorkflow";
-              return `${wf} / ${c.name}: status=${c.status}, conclusion=${c.conclusion}, c=${c}`;
+              return `${wf} / ${c.name}: status=${c.status}, conclusion=${c.conclusion}`;
             }
 
             async function waitForChecks() {
@@ -49,7 +49,7 @@ jobs:
                 );
 
                 console.log(`\n🔎 Attempt ${attempt}:`);
-                checks.forEach(c => console.log("- " + formatCheck(c)));
+                checks.forEach(c => console.log(JSON.stringify(c, null, 2) + "- " + formatCheck(c)));
 
                 if (failed.length > 0) {
                   console.log("❌ Some checks failed");
