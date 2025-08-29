@@ -32,11 +32,6 @@ jobs:
               return data.check_runs.filter(c => c.name !== gatekeeperName);
             }
 
-            function formatCheck(c) {
-              const wf = c.check_suite?.name || "UnknownWorkflow";
-              return `${wf} / ${c.name}: status=${c.status}, conclusion=${c.conclusion}`;
-            }
-
             async function waitForChecks() {
               for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                 const checks = await getChecks();
@@ -49,7 +44,7 @@ jobs:
                 );
 
                 console.log(`\n🔎 Attempt ${attempt}:`);
-                checks.forEach(c => console.log(JSON.stringify(c, null, 2) + "- " + formatCheck(c)));
+                checks.forEach(c => console.log("- ${c.name}: status=${c.status}, conclusion=${c.conclusion}");
 
                 if (failed.length > 0) {
                   console.log("❌ Some checks failed");
@@ -62,7 +57,7 @@ jobs:
                 }
 
                 if (attempt < maxAttempts) {
-                  console.log(`⏳ Still waiting on: ${pending.map(c => c.check_suite?.name + " / " + c.name).join(", ")}`);
+                  console.log(`⏳ Still waiting on: ${pending.map(c => c.name).join(", ")}`);
                   await new Promise(r => setTimeout(r, delayMs));
                 }
               }
