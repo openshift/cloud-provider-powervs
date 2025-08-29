@@ -34,7 +34,7 @@ jobs:
 
             function formatCheck(c) {
               const wf = c.check_suite?.name || "UnknownWorkflow";
-              return `${wf} / ${c.name}: status=${c.status}, conclusion=${c.conclusion}, c=$(c)`;
+              return `${wf} / ${c.name}: status=${c.status}, conclusion=${c.conclusion}, c=${c}`;
             }
 
             async function waitForChecks() {
