@@ -21,6 +21,19 @@ jobs:
             const maxAttempts = 20;
             const delayMs = 30000;
 
+            // Get all workflow runs for this commit (so we know workflow names)
+            const runs = await github.rest.actions.listWorkflowRunsForCommit({
+              owner: repoOwner,
+              repo: repoName,
+              commit_sha: sha,
+            });
+
+            // Build a map of check_suite_id -> workflow name
+            const suiteToWorkflow = {};
+            runs.data.workflow_runs.forEach(run => {
+              suiteToWorkflow[run.check_suite_id] = run.name;
+            });
+
             async function getChecks() {
               const { data } = await github.rest.checks.listForRef({
                 owner: repoOwner,
@@ -30,6 +43,11 @@ jobs:
 
               // Filter out Gatekeeper itself
               return data.check_runs.filter(c => c.name !== gatekeeperName);
+            }
+
+            function formatCheck(c) {
+              const wf = suiteToWorkflow[c.check_suite.id] || "UnknownWorkflow";
+              return `${wf} / ${c.name}: status=${c.status}, conclusion=${c.conclusion}`;
             }
 
             async function waitForChecks() {
@@ -44,7 +62,7 @@ jobs:
                 );
 
                 console.log(`\n🔎 Attempt ${attempt}:`);
-                checks.forEach(c => console.log("- ${c.name}: status=${c.status}, conclusion=${c.conclusion}");
+                checks.forEach(c => console.log("- " + formatCheck(c)));
 
                 if (failed.length > 0) {
                   console.log("❌ Some checks failed");
@@ -57,7 +75,7 @@ jobs:
                 }
 
                 if (attempt < maxAttempts) {
-                  console.log(`⏳ Still waiting on: ${pending.map(c => c.name).join(", ")}`);
+                  console.log(`⏳ Still waiting on: ${pending.map(c => suiteToWorkflow[c.check_suite.id] + " / " + c.name).join(", ")}`);
                   await new Promise(r => setTimeout(r, delayMs));
                 }
               }
