@@ -152,6 +152,9 @@ updates:
       ibm-sdk-1.34:
         patterns:
           - "github.com/IBM/*"
+      github-1.34:
+        patterns:
+          - "github.com/*"
     labels:
       - "dependencies"
       - "go"
@@ -184,6 +187,9 @@ updates:
       ibm-sdk-1.33:
         patterns:
           - "github.com/IBM/*"
+      github-1.33:
+        patterns:
+          - "github.com/*"
     labels:
       - "dependencies"
       - "go"
@@ -216,6 +222,9 @@ updates:
       ibm-sdk-1.32:
         patterns:
           - "github.com/IBM/*"
+      github-1.32:
+        patterns:
+          - "github.com/*"
     labels:
       - "dependencies"
       - "go"
@@ -248,6 +257,9 @@ updates:
       ibm-sdk-1.31:
         patterns:
           - "github.com/IBM/*"
+      github-1.31:
+        patterns:
+          - "github.com/*"
     labels:
       - "dependencies"
       - "go"
@@ -280,6 +292,9 @@ updates:
       ibm-sdk-1.30:
         patterns:
           - "github.com/IBM/*"
+      github-1.30:
+        patterns:
+          - "github.com/*"
     labels:
       - "dependencies"
       - "go"
@@ -312,6 +327,9 @@ updates:
       ibm-sdk-1.29:
         patterns:
           - "github.com/IBM/*"
+      github-1.29:
+        patterns:
+          - "github.com/*"
     labels:
       - "dependencies"
       - "go"
@@ -344,6 +362,9 @@ updates:
       ibm-sdk-1.28:
         patterns:
           - "github.com/IBM/*"
+      github-1.28:
+        patterns:
+          - "github.com/*"
     labels:
       - "dependencies"
       - "go"
@@ -376,6 +397,9 @@ updates:
       ibm-sdk-1.27:
         patterns:
           - "github.com/IBM/*"
+      github-1.27:
+        patterns:
+          - "github.com/*"
     labels:
       - "dependencies"
       - "go"
