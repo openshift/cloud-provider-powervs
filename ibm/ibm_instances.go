@@ -1,6 +1,6 @@
 /*******************************************************************************
 * IBM Cloud Kubernetes Service, 5737-D43
-* (C) Copyright IBM Corp. 2017, 2022, 2023, 2024 All Rights Reserved.
+* (C) Copyright IBM Corp. 2017, 2025 All Rights Reserved.
 *
 * SPDX-License-Identifier: Apache2.0
 *
@@ -125,9 +125,9 @@ func (c *Cloud) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprov
 		return nil, err
 	}
 
-	providerID := c.providerIDV2(ctx, nodeMD)
-	instanceType := c.instanceTypeV2(ctx, nodeMD)
-	nodeAddresses := c.nodeAddressesV2(ctx, nodeMD)
+	providerID := c.providerIDV2(nodeMD)
+	instanceType := c.instanceTypeV2(nodeMD)
+	nodeAddresses := c.nodeAddressesV2(nodeMD)
 
 	instanceMetadata := cloudprovider.InstanceMetadata{
 		ProviderID:    providerID,
@@ -141,26 +141,21 @@ func (c *Cloud) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprov
 }
 
 // get provider id from node labels
-func (c *Cloud) providerIDV2(ctx context.Context, nodeMD NodeMetadata) string {
+func (c *Cloud) providerIDV2(nodeMD NodeMetadata) string {
 	if nodeMD.ProviderID != "" {
 		return nodeMD.ProviderID
 	}
 	// construct provider id from config and node metadata
-	// ProviderID format for Power VS
-	// ProviderID = ibmpowervs://<powervs_region>/<powervs_zone>/<powervs_service_instanceid>/powervs_vm_instanceid
-	if isProviderPowerVS(c.Config.Prov) {
-		return fmt.Sprintf("ibmpowervs://%s/%s/%s/%s", c.Config.Prov.PowerVSRegion, c.Config.Prov.PowerVSZone, c.Metadata.provider.PowerVSCloudInstanceID, nodeMD.WorkerID)
-	}
 	return fmt.Sprintf("ibm://%s///%s/%s", c.Config.Prov.AccountID, c.Config.Prov.ClusterID, nodeMD.WorkerID)
 }
 
 // Get instance type from node labels
-func (c *Cloud) instanceTypeV2(ctx context.Context, nodeMD NodeMetadata) string {
+func (c *Cloud) instanceTypeV2(nodeMD NodeMetadata) string {
 	return nodeMD.InstanceType
 }
 
 // Get node addresses from node labels
-func (c *Cloud) nodeAddressesV2(ctx context.Context, nodeMD NodeMetadata) []v1.NodeAddress {
+func (c *Cloud) nodeAddressesV2(nodeMD NodeMetadata) []v1.NodeAddress {
 	// ExternalIP may not be provided by metadata for private-only nodes, but
 	// we will return one in case external consumers depend on it.
 	externalIP := nodeMD.ExternalIP

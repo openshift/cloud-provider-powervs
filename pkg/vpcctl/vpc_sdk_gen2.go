@@ -45,7 +45,7 @@ func NewVpcSdkGen2(c *ConfigVpc) (CloudVpcSdk, error) {
 		Authenticator: authenticator,
 		URL:           c.endpointURL})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create SDK client: %v", err)
+		return nil, fmt.Errorf("failed to create SDK client: %v", err)
 	}
 	// Convert the resource group name to an ID
 	if c.resourceGroupID == "" && c.ResourceGroupName != "" {
@@ -79,7 +79,7 @@ func convertResourceGroupNameToID(c *ConfigVpc) error {
 	authenticator := &core.IamAuthenticator{ApiKey: c.APIKeySecret, URL: c.tokenExchangeURL}
 	client, err := resourcemanagerv2.NewResourceManagerV2(&resourcemanagerv2.ResourceManagerV2Options{URL: url, Authenticator: authenticator})
 	if err != nil {
-		return fmt.Errorf("Failed to create resource manager v2 client: %v", err)
+		return fmt.Errorf("failed to create resource manager v2 client: %v", err)
 	}
 	// Retrieve the resource group
 	listOptions := &resourcemanagerv2.ListResourceGroupsOptions{AccountID: &c.AccountID, Name: &c.ResourceGroupName}
@@ -88,7 +88,7 @@ func convertResourceGroupNameToID(c *ConfigVpc) error {
 		if response != nil {
 			klog.Infof("Response (%d): %+v", response.StatusCode, response.Result)
 		}
-		return fmt.Errorf("Failed to ListResourceGroups: %v", err)
+		return fmt.Errorf("failed to ListResourceGroups: %v", err)
 	}
 	if len(list.Resources) != 1 {
 		return fmt.Errorf("%d resource groups match name: %s", len(list.Resources), c.ResourceGroupName)
@@ -104,14 +104,14 @@ func convertResourceGroupNameToID(c *ConfigVpc) error {
 func (v *VpcSdkGen2) CreateLoadBalancer(lbName string, nodeList, poolList, subnetList []string, options *ServiceOptions) (*VpcLoadBalancer, error) {
 	// For each of the ports in the Kubernetes service
 	listeners := []sdk.LoadBalancerListenerPrototypeLoadBalancerContext{}
-	pools := []sdk.LoadBalancerPoolPrototype{}
+	pools := []sdk.LoadBalancerPoolPrototypeLoadBalancerContext{}
 	for _, poolName := range poolList {
 		poolNameFields, err := extractFieldsFromPoolName(poolName)
 		if err != nil {
 			return nil, err
 		}
-		pool := sdk.LoadBalancerPoolPrototype{
-			Algorithm:     core.StringPtr(sdk.LoadBalancerPoolPrototypeAlgorithmRoundRobinConst),
+		pool := sdk.LoadBalancerPoolPrototypeLoadBalancerContext{
+			Algorithm:     core.StringPtr("round_robin"),
 			HealthMonitor: v.genLoadBalancerHealthMonitor(poolNameFields.NodePort, options.getHealthCheckNodePort()),
 			Members:       v.genLoadBalancerMembers(poolNameFields.NodePort, nodeList),
 			Name:          core.StringPtr(poolName),
@@ -538,7 +538,7 @@ func (v *VpcSdkGen2) mapLoadBalancerPool(item sdk.LoadBalancerPool) *VpcLoadBala
 		SessionPersistence: "None",
 	}
 	if item.HealthMonitor != nil {
-		pool.HealthMonitor = v.mapLoadBalancerPoolHealthMonitor(*item.HealthMonitor)
+		pool.HealthMonitor = v.mapLoadBalancerPoolHealthMonitor(item.HealthMonitor)
 	}
 	for _, memberRef := range item.Members {
 		pool.Members = append(pool.Members, &VpcLoadBalancerPoolMember{ID: SafePointerString(memberRef.ID)})
@@ -550,14 +550,29 @@ func (v *VpcSdkGen2) mapLoadBalancerPool(item sdk.LoadBalancerPool) *VpcLoadBala
 }
 
 // mapLoadBalancerPoolHealthMonitor - map the LoadBalancerPoolHealthMonitor to generic format
-func (v *VpcSdkGen2) mapLoadBalancerPoolHealthMonitor(item sdk.LoadBalancerPoolHealthMonitor) VpcLoadBalancerPoolHealthMonitor {
-	healthMonitor := VpcLoadBalancerPoolHealthMonitor{
-		Delay:      SafePointerInt64(item.Delay),
-		MaxRetries: SafePointerInt64(item.MaxRetries),
-		Port:       SafePointerInt64(item.Port),
-		Timeout:    SafePointerInt64(item.Timeout),
-		Type:       SafePointerString(item.Type),
-		URLPath:    SafePointerString(item.URLPath),
+func (v *VpcSdkGen2) mapLoadBalancerPoolHealthMonitor(item sdk.LoadBalancerPoolHealthMonitorIntf) VpcLoadBalancerPoolHealthMonitor {
+	healthMonitor := VpcLoadBalancerPoolHealthMonitor{}
+	switch hmType := item.(type) {
+	case *sdk.LoadBalancerPoolHealthMonitorTypeTCP:
+		healthMonitor.Delay = SafePointerInt64(hmType.Delay)
+		healthMonitor.MaxRetries = SafePointerInt64(hmType.MaxRetries)
+		healthMonitor.Port = SafePointerInt64(hmType.Port)
+		healthMonitor.Timeout = SafePointerInt64(hmType.Timeout)
+		healthMonitor.Type = SafePointerString(hmType.Type)
+	case *sdk.LoadBalancerPoolHealthMonitorTypeHttphttps:
+		healthMonitor.Delay = SafePointerInt64(hmType.Delay)
+		healthMonitor.MaxRetries = SafePointerInt64(hmType.MaxRetries)
+		healthMonitor.Port = SafePointerInt64(hmType.Port)
+		healthMonitor.Timeout = SafePointerInt64(hmType.Timeout)
+		healthMonitor.Type = SafePointerString(hmType.Type)
+		healthMonitor.URLPath = SafePointerString(hmType.URLPath)
+	case *sdk.LoadBalancerPoolHealthMonitor:
+		healthMonitor.Delay = SafePointerInt64(hmType.Delay)
+		healthMonitor.MaxRetries = SafePointerInt64(hmType.MaxRetries)
+		healthMonitor.Port = SafePointerInt64(hmType.Port)
+		healthMonitor.Timeout = SafePointerInt64(hmType.Timeout)
+		healthMonitor.Type = SafePointerString(hmType.Type)
+		healthMonitor.URLPath = SafePointerString(hmType.URLPath)
 	}
 	return healthMonitor
 }
