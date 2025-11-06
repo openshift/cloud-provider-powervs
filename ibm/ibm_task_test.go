@@ -1,6 +1,6 @@
 /*******************************************************************************
 * IBM Cloud Kubernetes Service, 5737-D43
-* (C) Copyright IBM Corp. 2017, 2021 All Rights Reserved.
+* (C) Copyright IBM Corp. 2017, 2025 All Rights Reserved.
 *
 * SPDX-License-Identifier: Apache2.0
 *
@@ -29,7 +29,7 @@ const runCountKey = "runCount"
 
 func cloudFunc(c *Cloud, data map[string]string) {
 	runCount := data[runCountKey]
-	if 0 == len(runCount) {
+	if len(runCount) == 0 {
 		data[runCountKey] = "1"
 	} else {
 		runCountI, _ := strconv.Atoi(runCount)
@@ -45,19 +45,21 @@ func TestTask(t *testing.T) {
 	c.StartTask(cloudFunc, time.Second*2)
 	ctName := getCloudTaskName(cloudFunc)
 	ct := c.CloudTasks[ctName]
-	if nil == ct {
+	//nolint:staticcheck // SA5011 not sure why the next line is being flagged
+	if ct == nil {
 		t.Fatalf("No cloud task created: %v", c.CloudTasks)
 	}
-	if 1 != len(c.CloudTasks) {
+	if len(c.CloudTasks) != 1 {
 		t.Fatalf("Unexpected number of cloud tasks created: %v", c.CloudTasks)
 	}
+	//nolint:staticcheck // SA5011 false positive: ct will never be null, earlier t.Fatalf will exit
 	if ct.Name != ctName {
 		t.Fatalf("Unexpected cloud task name")
 	}
 
 	// Verify another cloud task isn't started for the same function.
 	c.StartTask(cloudFunc, time.Second)
-	if 1 != len(c.CloudTasks) {
+	if len(c.CloudTasks) != 1 {
 		t.Fatalf("Unexpected number of cloud tasks created: %v", c.CloudTasks)
 	}
 
@@ -65,13 +67,13 @@ func TestTask(t *testing.T) {
 	time.Sleep(time.Second * 5)
 	c.StopTask(cloudFunc)
 	time.Sleep(time.Second * 5)
-	if 0 != len(c.CloudTasks) {
+	if len(c.CloudTasks) != 0 {
 		t.Fatalf("Unexpected number of cloud tasks exist: %v", c.CloudTasks)
 	}
 
 	// Stop cloud task that does not exist.
 	c.StopTask(cloudFunc)
-	if 0 != len(c.CloudTasks) {
+	if len(c.CloudTasks) != 0 {
 		t.Fatalf("Unexpected number of cloud tasks exist: %v", c.CloudTasks)
 	}
 }
