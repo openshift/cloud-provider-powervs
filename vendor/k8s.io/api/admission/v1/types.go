@@ -24,6 +24,7 @@ import (
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.19
 
 // AdmissionReview describes an admission review request/response.
 type AdmissionReview struct {
@@ -146,6 +147,7 @@ type AdmissionResponse struct {
 	// Limit warnings to 120 characters if possible.
 	// Warnings over 256 characters and large numbers of warnings may be truncated.
 	// +optional
+	// +listType=atomic
 	Warnings []string `json:"warnings,omitempty" protobuf:"bytes,7,rep,name=warnings"`
 }
 

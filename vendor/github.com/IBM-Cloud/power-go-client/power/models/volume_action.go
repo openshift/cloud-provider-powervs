@@ -8,10 +8,8 @@ package models
 import (
 	"context"
 
-	"github.com/go-openapi/errors"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
-	"github.com/go-openapi/validate"
 )
 
 // VolumeAction volume action
@@ -20,30 +18,17 @@ import (
 type VolumeAction struct {
 
 	// Indicates if the volume should be replication enabled or not
-	// Required: true
-	ReplicationEnabled *bool `json:"replicationEnabled"`
+	ReplicationEnabled *bool `json:"replicationEnabled,omitempty"`
+
+	// Target CRN of the secondary workspace where the auxiliary data resides; optional; only valid when changing the storage tier for a replication enabled volume; if specified, and the auxiliary volume is already onboarded, the primary volume change will be automatically applied to the auxiliary volume.
+	TargetCRN string `json:"targetCRN,omitempty"`
+
+	// Target storage tier; used to change a volume's storage tier
+	TargetStorageTier *string `json:"targetStorageTier,omitempty"`
 }
 
 // Validate validates this volume action
 func (m *VolumeAction) Validate(formats strfmt.Registry) error {
-	var res []error
-
-	if err := m.validateReplicationEnabled(formats); err != nil {
-		res = append(res, err)
-	}
-
-	if len(res) > 0 {
-		return errors.CompositeValidationError(res...)
-	}
-	return nil
-}
-
-func (m *VolumeAction) validateReplicationEnabled(formats strfmt.Registry) error {
-
-	if err := validate.Required("replicationEnabled", "body", m.ReplicationEnabled); err != nil {
-		return err
-	}
-
 	return nil
 }
 
