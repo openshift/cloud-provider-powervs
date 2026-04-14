@@ -1,6 +1,6 @@
 /*******************************************************************************
 * IBM Cloud Kubernetes Service, 5737-D43
-* (C) Copyright IBM Corp. 2021, 2024 All Rights Reserved.
+* (C) Copyright IBM Corp. 2021, 2026 All Rights Reserved.
 *
 * SPDX-License-Identifier: Apache2.0
 *
@@ -46,7 +46,7 @@ func TestShouldPrivateEndpointBeEnabled(t *testing.T) {
 }
 
 func TestCloud_InitCloudVpc(t *testing.T) {
-	c := Cloud{Config: &CloudConfig{Prov: Provider{ClusterID: cluster}}, KubeClient: fake.NewSimpleClientset()}
+	c := Cloud{Config: &CloudConfig{Prov: Provider{ClusterID: cluster}}, KubeClient: fake.NewClientset()}
 	v, err := c.InitCloudVpc(shouldPrivateEndpointBeEnabled())
 	assert.Nil(t, v)
 	assert.NotNil(t, err)
@@ -67,10 +67,10 @@ func TestCloud_NewConfigVpc(t *testing.T) {
 	config, err := c.NewConfigVpc(true)
 	assert.Nil(t, config)
 	assert.NotNil(t, err)
-	assert.Equal(t, err.Error(), "Cloud config not initialized")
+	assert.Equal(t, err.Error(), "cloud config not initialized")
 
 	// Test failure to read credentials from file
-	c.Config = &CloudConfig{Prov: Provider{
+	c.Config = &CloudConfig{Prov: Provider{ // #nosec G101 "Potential hardcoded credentials" - ignore, invalid warning
 		Region:                   "us-south",
 		AccountID:                "accountID",
 		ClusterID:                "clusterID",
@@ -87,7 +87,7 @@ func TestCloud_NewConfigVpc(t *testing.T) {
 	config, err = c.NewConfigVpc(true)
 	assert.Nil(t, config)
 	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "Failed to read credentials")
+	assert.Contains(t, err.Error(), "failed to read credentials")
 
 	// Successfully return ConfigVpc
 	c.Config.Prov.G2Credentials = ""
@@ -112,8 +112,8 @@ func TestCloud_NewConfigVpc(t *testing.T) {
 func TestCloud_VpcEnsureLoadBalancer(t *testing.T) {
 	cloud := Cloud{
 		Config:     &CloudConfig{Prov: Provider{ClusterID: "clusterID", ProviderType: vpcctl.VpcProviderTypeGen2}},
-		KubeClient: fake.NewSimpleClientset(),
-		Recorder:   NewCloudEventRecorderV1("ibm", fake.NewSimpleClientset().CoreV1().Events("")),
+		KubeClient: fake.NewClientset(),
+		Recorder:   NewCloudEventRecorderV1("ibm", fake.NewClientset().CoreV1().Events("")),
 	}
 	node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "192.168.0.1", Labels: map[string]string{}}}
 
@@ -138,14 +138,14 @@ func TestCloud_VpcEnsureLoadBalancer(t *testing.T) {
 	status, err = cloud.VpcEnsureLoadBalancer(context.Background(), clusterName, service, []*v1.Node{node})
 	assert.Nil(t, status)
 	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "Failed initializing VPC")
+	assert.Contains(t, err.Error(), "failed initializing VPC")
 }
 
 func TestCloud_VpcEnsureLoadBalancerDeleted(t *testing.T) {
 	cloud := Cloud{
 		Config:     &CloudConfig{Prov: Provider{ClusterID: "clusterID", ProviderType: vpcctl.VpcProviderTypeGen2}},
-		KubeClient: fake.NewSimpleClientset(),
-		Recorder:   NewCloudEventRecorderV1("ibm", fake.NewSimpleClientset().CoreV1().Events("")),
+		KubeClient: fake.NewClientset(),
+		Recorder:   NewCloudEventRecorderV1("ibm", fake.NewClientset().CoreV1().Events("")),
 	}
 	service := &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "echo-server", Namespace: "default", UID: "Ready"}}
 
@@ -153,7 +153,7 @@ func TestCloud_VpcEnsureLoadBalancerDeleted(t *testing.T) {
 	vpcctl.ResetCloudVpc()
 	err := cloud.VpcEnsureLoadBalancerDeleted(context.Background(), clusterName, service)
 	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "Failed initializing VPC")
+	assert.Contains(t, err.Error(), "failed initializing VPC")
 
 	// VpcEnsureLoadBalancerDeleted successful, existing LB was deleted
 	cloud.Config.Prov.ProviderType = vpcctl.VpcProviderTypeFake
@@ -172,8 +172,8 @@ func TestCloud_VpcEnsureLoadBalancerDeleted(t *testing.T) {
 func TestCloud_VpcGetLoadBalancer(t *testing.T) {
 	cloud := Cloud{
 		Config:     &CloudConfig{Prov: Provider{ClusterID: "clusterID", ProviderType: vpcctl.VpcProviderTypeGen2}},
-		KubeClient: fake.NewSimpleClientset(),
-		Recorder:   NewCloudEventRecorderV1("ibm", fake.NewSimpleClientset().CoreV1().Events("")),
+		KubeClient: fake.NewClientset(),
+		Recorder:   NewCloudEventRecorderV1("ibm", fake.NewClientset().CoreV1().Events("")),
 	}
 	service := &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "echo-server", Namespace: "default", UID: "Ready"}}
 
@@ -183,7 +183,7 @@ func TestCloud_VpcGetLoadBalancer(t *testing.T) {
 	assert.Nil(t, status)
 	assert.False(t, exist)
 	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "Failed initializing VPC")
+	assert.Contains(t, err.Error(), "failed initializing VPC")
 
 	// VpcGetLoadBalancer successful, LB is ready
 	cloud.Config.Prov.ProviderType = vpcctl.VpcProviderTypeFake
@@ -220,8 +220,8 @@ func TestCloud_VpcGetLoadBalancerName(t *testing.T) {
 func TestCloud_VpcMonitorLoadBalancers(t *testing.T) {
 	cloud := Cloud{
 		Config:     &CloudConfig{Prov: Provider{ClusterID: "clusterID", ProviderType: vpcctl.VpcProviderTypeGen2}},
-		KubeClient: fake.NewSimpleClientset(),
-		Recorder:   NewCloudEventRecorderV1("ibm", fake.NewSimpleClientset().CoreV1().Events("")),
+		KubeClient: fake.NewClientset(),
+		Recorder:   NewCloudEventRecorderV1("ibm", fake.NewClientset().CoreV1().Events("")),
 	}
 	serviceNodePort := v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "nodePort", Namespace: "default", UID: "NodePort"},
 		Spec: v1.ServiceSpec{Type: v1.ServiceTypeNodePort}}
@@ -246,8 +246,8 @@ func TestCloud_VpcMonitorLoadBalancers(t *testing.T) {
 func TestCloud_VpcUpdateLoadBalancer(t *testing.T) {
 	cloud := Cloud{
 		Config:     &CloudConfig{Prov: Provider{ClusterID: "clusterID", ProviderType: vpcctl.VpcProviderTypeGen2}},
-		KubeClient: fake.NewSimpleClientset(),
-		Recorder:   NewCloudEventRecorderV1("ibm", fake.NewSimpleClientset().CoreV1().Events("")),
+		KubeClient: fake.NewClientset(),
+		Recorder:   NewCloudEventRecorderV1("ibm", fake.NewClientset().CoreV1().Events("")),
 	}
 	node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "192.168.0.1", Labels: map[string]string{}}}
 	service := &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "echo-server", Namespace: "default", UID: "Ready"}}
@@ -255,13 +255,13 @@ func TestCloud_VpcUpdateLoadBalancer(t *testing.T) {
 	// VpcUpdateLoadBalancer failed, node list is empty
 	err := cloud.VpcUpdateLoadBalancer(context.Background(), clusterName, service, []*v1.Node{})
 	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "There are no available nodes for LoadBalancer")
+	assert.Contains(t, err.Error(), "no available nodes for LoadBalancer")
 
 	// VpcUpdateLoadBalancer failed, failed to initialize VPC env
 	vpcctl.ResetCloudVpc()
 	err = cloud.VpcUpdateLoadBalancer(context.Background(), clusterName, service, []*v1.Node{node})
 	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "Failed initializing VPC")
+	assert.Contains(t, err.Error(), "failed initializing VPC")
 }
 
 func TestCloud_WatchCloudCredential(t *testing.T) {
@@ -272,7 +272,7 @@ func TestCloud_WatchCloudCredential(t *testing.T) {
 	// WatchCloudCredential failed, no cloud credential file
 	err := cloud.WatchCloudCredential()
 	assert.NotNil(t, err)
-	assert.Contains(t, err.Error(), "No cloud credential file to watch")
+	assert.Contains(t, err.Error(), "no cloud credential file to watch")
 
 	// WatchCloudCredential failed, cloud credential file does not exist
 	cloud.Config.Prov.G2Credentials = "/tmp/file_does_not_exist"
