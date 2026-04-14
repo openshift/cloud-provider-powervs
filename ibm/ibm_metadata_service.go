@@ -219,7 +219,7 @@ func (ms *MetadataService) GetNodeMetadata(name string, applyNetworkUnavailable 
 		return newNode, nil
 	} else if isProviderVpc(ms.provider.ProviderType) {
 		if isProviderPowerVS(ms.provider) {
-			klog.Infof("Retrieving information for node=" + name + " from Power VS ")
+			klog.Info("Retrieving information for node=" + name + " from Power VS ")
 			if ms.powerVSClient == nil {
 				ms.powerVSClient, err = newPowerVSClient(&ms.provider)
 				if err != nil {
@@ -235,7 +235,7 @@ func (ms *MetadataService) GetNodeMetadata(name string, applyNetworkUnavailable 
 			}
 		} else {
 			// labels were not set; if VPC we can try to call api for values
-			klog.Infof("Retrieving information for node=" + name + " from VPC")
+			klog.Info("Retrieving information for node=" + name + " from VPC")
 
 			// create vpcClient if we haven't already
 			if ms.vpcClient == nil {
