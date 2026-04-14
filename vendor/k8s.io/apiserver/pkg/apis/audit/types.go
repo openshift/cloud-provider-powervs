@@ -97,7 +97,17 @@ type Event struct {
 	// Impersonated user information.
 	// +optional
 	ImpersonatedUser *authnv1.UserInfo
+	// AuthenticationMetadata contains details about how the request was authenticated.
+	// +optional
+	AuthenticationMetadata *AuthenticationMetadata
+
 	// Source IPs, from where the request originated and intermediate proxies.
+	// The source IPs are listed from (in order):
+	// 1. X-Forwarded-For request header IPs
+	// 2. X-Real-Ip header, if not present in the X-Forwarded-For list
+	// 3. The remote address for the connection, if it doesn't match the last
+	//    IP in the list up to here (X-Forwarded-For or X-Real-Ip).
+	// Note: All but the last IP can be arbitrarily set by the client.
 	// +optional
 	SourceIPs []string
 	// UserAgent records the user agent string reported by the client.
@@ -139,6 +149,13 @@ type Event struct {
 	// should be short. Annotations are included in the Metadata level.
 	// +optional
 	Annotations map[string]string
+}
+
+type AuthenticationMetadata struct {
+	// ImpersonationConstraint is the verb associated with the constrained impersonation mode that was used to authorize
+	// the ImpersonatedUser associated with this audit event.  It is only set when constrained impersonation was used.
+	// +optional
+	ImpersonationConstraint string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -229,10 +246,10 @@ type PolicyRule struct {
 	Namespaces []string
 
 	// NonResourceURLs is a set of URL paths that should be audited.
-	// *s are allowed, but only as the full, final step in the path.
+	// `*`s are allowed, but only as the full, final step in the path.
 	// Examples:
-	//  "/metrics" - Log requests for apiserver metrics
-	//  "/healthz*" - Log all health checks
+	//  `/metrics` - Log requests for apiserver metrics
+	//  `/healthz*` - Log all health checks
 	// +optional
 	NonResourceURLs []string
 
@@ -263,11 +280,11 @@ type GroupResources struct {
 	// Resources is a list of resources this rule applies to.
 	//
 	// For example:
-	// 'pods' matches pods.
-	// 'pods/log' matches the log subresource of pods.
-	// '*' matches all resources and their subresources.
-	// 'pods/*' matches all subresources of pods.
-	// '*/scale' matches all scale subresources.
+	// - `pods` matches pods.
+	// - `pods/log` matches the log subresource of pods.
+	// - `*` matches all resources and their subresources.
+	// - `pods/*` matches all subresources of pods.
+	// - `*/scale` matches all scale subresources.
 	//
 	// If wildcard is present, the validation rule will ensure resources do not
 	// overlap with each other.
