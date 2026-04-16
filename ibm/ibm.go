@@ -1,6 +1,6 @@
 /*******************************************************************************
 * IBM Cloud Kubernetes Service, 5737-D43
-* (C) Copyright IBM Corp. 2017, 2024 All Rights Reserved.
+* (C) Copyright IBM Corp. 2017, 2025 All Rights Reserved.
 *
 * SPDX-License-Identifier: Apache2.0
 *
@@ -142,10 +142,6 @@ type CloudConfig struct {
 		// an in cluster config is not support for classic infrastructure
 		// since Calico does not support such configurations.
 		ConfigFilePaths []string `gcfg:"config-file"`
-		// The Calico datastore type: "ETCD" or "KDD". Required when running on
-		// classic infrastructure, otherwise this may be omitted and will be
-		// ignored for VPC infrastructure.
-		CalicoDatastore string `gcfg:"calico-datastore"`
 		// If set to true, all new nodes will get the condition NetworkUnavailable
 		// during node registration
 		SetNetworkUnavailable bool `gcfg:"set-network-unavailable,false"`
@@ -196,7 +192,7 @@ func (c *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 
 	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
 	// #nosec G104 Error is ignored for now
-	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	nodeInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{ // nolint:errcheck
 		DeleteFunc: c.handleNodeDelete,
 	})
 
@@ -226,7 +222,7 @@ func getK8SConfig(k8sConfigFilePaths []string) (*restclient.Config, error) {
 		}
 	}
 	if nil == config {
-		return nil, fmt.Errorf("Failed to build Kubernetes cloud configuration")
+		return nil, fmt.Errorf("failed to build Kubernetes cloud configuration")
 	}
 	return config, nil
 }
@@ -238,11 +234,11 @@ func getCloudConfig(config io.Reader) (*CloudConfig, error) {
 	if nil != config {
 		err := gcfg.FatalOnly(gcfg.ReadInto(&cloudConfig, config))
 		if nil != err {
-			return nil, fmt.Errorf("Failed to read cloud config: %v", err)
+			return nil, fmt.Errorf("failed to read cloud config: %v", err)
 		}
 		// Validate that the cloud config version is supported.
 		// Other config data will be validated when used.
-		if "1.0.0" != cloudConfig.Global.Version && "1.1.0" != cloudConfig.Global.Version {
+		if cloudConfig.Global.Version != "1.0.0" && cloudConfig.Global.Version != "1.1.0" {
 			return nil, fmt.Errorf("Cloud config version not valid: %v", cloudConfig.Global.Version)
 		}
 	} else {
@@ -268,7 +264,7 @@ func NewCloud(config io.Reader) (cloudprovider.Interface, error) {
 
 	// Get the k8s config.
 	// Use in cluster config if no config file paths were provided.
-	if 0 == len(cloudConfig.Kubernetes.ConfigFilePaths) {
+	if len(cloudConfig.Kubernetes.ConfigFilePaths) == 0 {
 		cloudConfig.Kubernetes.ConfigFilePaths = append(cloudConfig.Kubernetes.ConfigFilePaths, "")
 	}
 	k8sConfig, err = getK8SConfig(cloudConfig.Kubernetes.ConfigFilePaths)
@@ -279,7 +275,7 @@ func NewCloud(config io.Reader) (cloudprovider.Interface, error) {
 	// Create the k8s client.
 	k8sClient, err = clientset.NewForConfig(k8sConfig)
 	if nil != err {
-		return nil, fmt.Errorf("Failed to create Kubernetes client: %v", err)
+		return nil, fmt.Errorf("failed to create Kubernetes client: %v", err)
 	}
 
 	// Create the metadataservice
@@ -304,7 +300,7 @@ func NewCloud(config io.Reader) (cloudprovider.Interface, error) {
 		klog.Infof("Initialize VPC with cloud config: %+v", cloudConfig.Prov)
 		_, err := c.InitCloudVpc(shouldPrivateEndpointBeEnabled())
 		if err != nil {
-			errString := fmt.Sprintf("Failed initializing VPC: %v", err)
+			errString := fmt.Sprintf("failed initializing VPC: %v", err)
 			klog.Warning(errString)
 		}
 	} else {
@@ -312,7 +308,6 @@ func NewCloud(config io.Reader) (cloudprovider.Interface, error) {
 		classicConfig := &classic.CloudConfig{
 			APIKeySecretPath:           c.Config.Prov.CloudCredentials,
 			Application:                c.Config.LBDeployment.Application,
-			CalicoDatastore:            c.Config.Kubernetes.CalicoDatastore,
 			ClusterID:                  c.Config.Prov.ClusterID,
 			ConfigFilePath:             c.Config.Kubernetes.ConfigFilePaths[0],
 			Region:                     c.Config.Prov.Region,
