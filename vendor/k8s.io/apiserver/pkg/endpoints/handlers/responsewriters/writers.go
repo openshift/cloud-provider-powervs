@@ -18,14 +18,15 @@ package responsewriters
 
 import (
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
-	"sync"
 	"time"
+
+	"go.opentelemetry.io/otel/attribute"
 
 	"k8s.io/apiserver/pkg/features"
 
@@ -39,8 +40,8 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flushwriter"
-	"k8s.io/apiserver/pkg/util/wsstream"
-	utiltrace "k8s.io/utils/trace"
+	"k8s.io/component-base/tracing"
+	"k8s.io/streaming/pkg/httpstream/wsstream"
 )
 
 // StreamObject performs input stream negotiation from a ResourceStreamer and writes that to the response.
@@ -87,20 +88,32 @@ func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSe
 // The context is optional and can be nil. This method will perform optional content compression if requested by
 // a client and the feature gate for APIResponseCompression is enabled.
 func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
-	trace := utiltrace.New("SerializeObject",
-		utiltrace.Field{"method", req.Method},
-		utiltrace.Field{"url", req.URL.Path},
-		utiltrace.Field{"protocol", req.Proto},
-		utiltrace.Field{"mediaType", mediaType},
-		utiltrace.Field{"encoder", encoder.Identifier()})
-	defer trace.LogIfLong(5 * time.Second)
+	ctx := req.Context()
+	ctx, span := tracing.Start(ctx, "SerializeObject",
+		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
+		attribute.String("method", req.Method),
+		attribute.String("url", req.URL.Path),
+		attribute.String("protocol", req.Proto),
+		attribute.String("mediaType", mediaType),
+		attribute.String("encoder", string(encoder.Identifier())))
+	req = req.WithContext(ctx)
+	defer span.End(5 * time.Second)
 
 	w := &deferredResponseWriter{
 		mediaType:       mediaType,
 		statusCode:      statusCode,
-		contentEncoding: negotiateContentEncoding(req),
+		contentEncoding: responseContentEncodingSupported(req),
 		hw:              hw,
-		trace:           trace,
+		ctx:             ctx,
+	}
+
+	var memoryAllocator runtime.MemoryAllocator
+	if encoderWithAllocator, supportsAllocator := encoder.(runtime.EncoderWithAllocator); supportsAllocator {
+		memoryAllocator = runtime.AllocatorPool.Get().(*runtime.Allocator)
+		encoder = runtime.NewEncoderWithAllocator(encoderWithAllocator, memoryAllocator)
+	}
+	if memoryAllocator != nil {
+		defer runtime.AllocatorPool.Put(memoryAllocator)
 	}
 
 	err := encoder.Encode(object, w)
@@ -114,7 +127,8 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 	}
 
 	// make a best effort to write the object if a failure is detected
-	utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a JSON response: %v", err))
+	utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a %s response: %w", w.mediaType, err))
+	w.discardBufferedResponse()
 	status := ErrorToAPIStatus(err)
 	candidateStatusCode := int(status.Code)
 	// if the current status code is successful, allow the error's status code to overwrite it
@@ -127,84 +141,92 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 		output = []byte(fmt.Sprintf("%s: %s", status.Reason, status.Message))
 	}
 	if _, err := w.Write(output); err != nil {
-		utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a fallback JSON response: %v", err))
+		utilruntime.HandleError(fmt.Errorf("apiserver was unable to write a fallback %s response: %w", w.mediaType, err))
 	}
 	w.Close()
 }
 
-var gzipPool = &sync.Pool{
-	New: func() interface{} {
-		gw, err := gzip.NewWriterLevel(nil, defaultGzipContentEncodingLevel)
-		if err != nil {
-			panic(err)
-		}
-		return gw
-	},
-}
+var gzipPool = NewGzipWriterPoolOrDie()
 
 const (
-	// defaultGzipContentEncodingLevel is set to 4 which uses less CPU than the default level
-	defaultGzipContentEncodingLevel = 4
 	// defaultGzipThresholdBytes is compared to the size of the first write from the stream
 	// (usually the entire object), and if the size is smaller no gzipping will be performed
 	// if the client requests it.
 	defaultGzipThresholdBytes = 128 * 1024
+	// Use the length of the first write to recognize streaming implementations.
+	// When streaming JSON first write is "{", while Kubernetes protobuf starts unique 4 byte header.
+	firstWriteStreamingThresholdBytes = 4
 )
-
-// negotiateContentEncoding returns a supported client-requested content encoding for the
-// provided request. It will return the empty string if no supported content encoding was
-// found or if response compression is disabled.
-func negotiateContentEncoding(req *http.Request) string {
-	encoding := req.Header.Get("Accept-Encoding")
-	if len(encoding) == 0 {
-		return ""
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression) {
-		return ""
-	}
-	for len(encoding) > 0 {
-		var token string
-		if next := strings.Index(encoding, ","); next != -1 {
-			token = encoding[:next]
-			encoding = encoding[next+1:]
-		} else {
-			token = encoding
-			encoding = ""
-		}
-		switch strings.TrimSpace(token) {
-		case "gzip":
-			return "gzip"
-		}
-	}
-	return ""
-}
 
 type deferredResponseWriter struct {
 	mediaType       string
 	statusCode      int
 	contentEncoding string
 
-	hasWritten bool
-	hw         http.ResponseWriter
-	w          io.Writer
+	hasBuffered bool
+	buffer      []byte
+	hasWritten  bool
+	hw          http.ResponseWriter
+	w           io.Writer
+	// totalBytes is the number of bytes written to `w` and does not include buffered bytes
+	totalBytes int
+	// lastWriteErr holds the error result (if any) of the last write attempt to `w`
+	lastWriteErr error
 
-	trace *utiltrace.Trace
+	ctx context.Context
 }
 
 func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
-	if w.trace != nil {
-		// This Step usually wraps in-memory object serialization.
-		w.trace.Step("About to start writing response", utiltrace.Field{"size", len(p)})
+	switch {
+	case w.hasWritten:
+		// already written, cannot buffer
+		return w.unbufferedWrite(p)
 
-		firstWrite := !w.hasWritten
-		defer func() {
-			w.trace.Step("Write call finished",
-				utiltrace.Field{"writer", fmt.Sprintf("%T", w.w)},
-				utiltrace.Field{"size", len(p)},
-				utiltrace.Field{"firstWrite", firstWrite},
-				utiltrace.Field{"err", err})
-		}()
+	case w.contentEncoding != "gzip":
+		// non-gzip, no need to buffer
+		return w.unbufferedWrite(p)
+
+	case !w.hasBuffered && len(p) > defaultGzipThresholdBytes:
+		// not yet buffered, first write is long enough to trigger gzip, no need to buffer
+		return w.unbufferedWrite(p)
+
+	case !w.hasBuffered && len(p) > firstWriteStreamingThresholdBytes:
+		// not yet buffered, first write is longer than expected for streaming scenarios that would require buffering, no need to buffer
+		return w.unbufferedWrite(p)
+
+	default:
+		if !w.hasBuffered {
+			w.hasBuffered = true
+			// Start at 80 bytes to avoid rapid reallocation of the buffer.
+			// The minimum size of a 0-item serialized list object is 80 bytes:
+			// {"kind":"List","apiVersion":"v1","metadata":{"resourceVersion":"1"},"items":[]}\n
+			w.buffer = make([]byte, 0, max(80, len(p)))
+		}
+		w.buffer = append(w.buffer, p...)
+		var err error
+		if len(w.buffer) > defaultGzipThresholdBytes {
+			// we've accumulated enough to trigger gzip, write and clear buffer
+			_, err = w.unbufferedWrite(w.buffer)
+			w.buffer = nil
+		}
+		return len(p), err
 	}
+}
+
+func (w *deferredResponseWriter) discardBufferedResponse() {
+	if w.hasWritten {
+		return
+	}
+	w.hasBuffered = false
+	w.buffer = nil
+}
+
+func (w *deferredResponseWriter) unbufferedWrite(p []byte) (n int, err error) {
+	defer func() {
+		w.totalBytes += n
+		w.lastWriteErr = err
+	}()
+
 	if w.hasWritten {
 		return w.w.Write(p)
 	}
@@ -225,16 +247,45 @@ func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
 		w.w = hw
 	}
 
+	span := tracing.SpanFromContext(w.ctx)
+	span.AddEvent("About to start writing response",
+		attribute.String("writer", fmt.Sprintf("%T", w.w)),
+		attribute.Int("size", len(p)),
+	)
+
 	header.Set("Content-Type", w.mediaType)
 	hw.WriteHeader(w.statusCode)
 	return w.w.Write(p)
 }
 
-func (w *deferredResponseWriter) Close() error {
+func (w *deferredResponseWriter) Close() (err error) {
+	defer func() {
+		if !w.hasWritten {
+			return
+		}
+
+		span := tracing.SpanFromContext(w.ctx)
+
+		if w.lastWriteErr != nil {
+			span.AddEvent("Write call failed",
+				attribute.Int("size", w.totalBytes),
+				attribute.String("err", w.lastWriteErr.Error()))
+		} else {
+			span.AddEvent("Write call succeeded",
+				attribute.Int("size", w.totalBytes))
+		}
+	}()
+
 	if !w.hasWritten {
-		return nil
+		if !w.hasBuffered {
+			return nil
+		}
+		// never reached defaultGzipThresholdBytes, no need to do the gzip writer cleanup
+		_, err := w.unbufferedWrite(w.buffer)
+		w.buffer = nil
+		return err
 	}
-	var err error
+
 	switch t := w.w.(type) {
 	case *gzip.Writer:
 		err = t.Close()
@@ -245,7 +296,7 @@ func (w *deferredResponseWriter) Close() error {
 }
 
 // WriteObjectNegotiated renders an object in the content type negotiated by the client.
-func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiation.EndpointRestrictions, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
+func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiation.EndpointRestrictions, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object, listGVKInContentType bool) {
 	stream, ok := object.(rest.ResourceStreamer)
 	if ok {
 		requestInfo, _ := request.RequestInfoFrom(req.Context())
@@ -255,7 +306,7 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiat
 		return
 	}
 
-	_, serializer, err := negotiation.NegotiateOutputMediaType(req, s, restrictions)
+	mediaType, serializer, err := negotiation.NegotiateOutputMediaType(req, s, restrictions)
 	if err != nil {
 		// if original statusCode was not successful we need to return the original error
 		// we cannot hide it behind negotiation problems
@@ -270,8 +321,35 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiat
 
 	audit.LogResponseObject(req.Context(), object, gv, s)
 
-	encoder := s.EncoderForVersion(serializer.Serializer, gv)
-	SerializeObject(serializer.MediaType, encoder, w, req, statusCode, object)
+	var encoder runtime.Encoder
+	if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
+		encoder = s.EncoderForVersion(runtime.UseNondeterministicEncoding(serializer.Serializer), gv)
+	} else {
+		encoder = s.EncoderForVersion(serializer.Serializer, gv)
+	}
+	request.TrackSerializeResponseObjectLatency(req.Context(), func() {
+		if listGVKInContentType {
+			SerializeObject(generateMediaTypeWithGVK(serializer.MediaType, mediaType.Convert), encoder, w, req, statusCode, object)
+		} else {
+			SerializeObject(serializer.MediaType, encoder, w, req, statusCode, object)
+		}
+	})
+}
+
+func generateMediaTypeWithGVK(mediaType string, gvk *schema.GroupVersionKind) string {
+	if gvk == nil {
+		return mediaType
+	}
+	if gvk.Group != "" {
+		mediaType += ";g=" + gvk.Group
+	}
+	if gvk.Version != "" {
+		mediaType += ";v=" + gvk.Version
+	}
+	if gvk.Kind != "" {
+		mediaType += ";as=" + gvk.Kind
+	}
+	return mediaType
 }
 
 // ErrorNegotiated renders an error to the response. Returns the HTTP status code of the error.
@@ -290,7 +368,7 @@ func ErrorNegotiated(err error, s runtime.NegotiatedSerializer, gv schema.GroupV
 		return code
 	}
 
-	WriteObjectNegotiated(s, negotiation.DefaultEndpointRestrictions, gv, w, req, code, status)
+	WriteObjectNegotiated(s, negotiation.DefaultEndpointRestrictions, gv, w, req, code, status, false)
 	return code
 }
 
