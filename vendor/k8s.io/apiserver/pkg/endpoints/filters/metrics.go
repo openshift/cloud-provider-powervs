@@ -19,7 +19,10 @@ package filters
 import (
 	"context"
 	"strings"
+	"sync"
 	"time"
+
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/component-base/metrics"
@@ -38,6 +41,10 @@ const (
 	successLabel = "success"
 	failureLabel = "failure"
 	errorLabel   = "error"
+
+	allowedLabel   = "allowed"
+	deniedLabel    = "denied"
+	noOpinionLabel = "no-opinion"
 )
 
 var (
@@ -68,15 +75,63 @@ var (
 		},
 		[]string{"result"},
 	)
+
+	authorizationAttemptsCounter = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "authorization_attempts_total",
+			Help:           "Counter of authorization attempts broken down by result. It can be either 'allowed', 'denied', 'no-opinion' or 'error'.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"result"},
+	)
+
+	authorizationLatency = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Name:           "authorization_duration_seconds",
+			Help:           "Authorization duration in seconds broken out by result.",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"result"},
+	)
 )
 
-func init() {
-	legacyregistry.MustRegister(authenticatedUserCounter)
-	legacyregistry.MustRegister(authenticatedAttemptsCounter)
-	legacyregistry.MustRegister(authenticationLatency)
+var registerMetricsOnce sync.Once
+
+// RegisterMetrics registers the authentication and authorization filter metrics
+// with the legacy registry. It is invoked when the authentication/authorization
+// filters are installed into the handler chain (rather than from an init()
+// function), so that metric feature gates such as NativeHistograms have been
+// applied before these histogram metrics are created.
+func RegisterMetrics() {
+	registerMetricsOnce.Do(func() {
+		legacyregistry.MustRegister(authenticatedUserCounter)
+		legacyregistry.MustRegister(authenticatedAttemptsCounter)
+		legacyregistry.MustRegister(authenticationLatency)
+		legacyregistry.MustRegister(authorizationAttemptsCounter)
+		legacyregistry.MustRegister(authorizationLatency)
+	})
 }
 
-func recordAuthMetrics(ctx context.Context, resp *authenticator.Response, ok bool, err error, apiAudiences authenticator.Audiences, authStart time.Time, authFinish time.Time) {
+func recordAuthorizationMetrics(ctx context.Context, authorized authorizer.Decision, err error, authStart time.Time, authFinish time.Time) {
+	var resultLabel string
+
+	switch {
+	case authorized == authorizer.DecisionAllow:
+		resultLabel = allowedLabel
+	case err != nil:
+		resultLabel = errorLabel
+	case authorized == authorizer.DecisionDeny:
+		resultLabel = deniedLabel
+	case authorized == authorizer.DecisionNoOpinion:
+		resultLabel = noOpinionLabel
+	}
+
+	authorizationAttemptsCounter.WithContext(ctx).WithLabelValues(resultLabel).Inc()
+	authorizationLatency.WithContext(ctx).WithLabelValues(resultLabel).Observe(authFinish.Sub(authStart).Seconds())
+}
+
+func recordAuthenticationMetrics(ctx context.Context, resp *authenticator.Response, ok bool, err error, apiAudiences authenticator.Audiences, authStart time.Time, authFinish time.Time) {
 	var resultLabel string
 
 	switch {

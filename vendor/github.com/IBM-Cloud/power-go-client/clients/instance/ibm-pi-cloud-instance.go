@@ -6,32 +6,31 @@ import (
 
 	"github.com/IBM-Cloud/power-go-client/errors"
 	"github.com/IBM-Cloud/power-go-client/helpers"
-
 	"github.com/IBM-Cloud/power-go-client/ibmpisession"
 	"github.com/IBM-Cloud/power-go-client/power/client/p_cloud_instances"
 	"github.com/IBM-Cloud/power-go-client/power/models"
 )
 
-// IBMPICloudInstanceClient ...
+// IBMPICloudInstanceClient
 type IBMPICloudInstanceClient struct {
 	IBMPIClient
 }
 
-// NewIBMPICloudInstanceClient ...
+// NewIBMPICloudInstanceClient
 func NewIBMPICloudInstanceClient(ctx context.Context, sess *ibmpisession.IBMPISession, cloudInstanceID string) *IBMPICloudInstanceClient {
 	return &IBMPICloudInstanceClient{
 		*NewIBMPIClient(ctx, sess, cloudInstanceID),
 	}
 }
 
-// Get information about a cloud instance
+// Get a Cloud Instance
 func (f *IBMPICloudInstanceClient) Get(id string) (*models.CloudInstance, error) {
 	params := p_cloud_instances.NewPcloudCloudinstancesGetParams().
 		WithContext(f.ctx).WithTimeout(helpers.PIGetTimeOut).
 		WithCloudInstanceID(id)
 	resp, err := f.session.Power.PCloudInstances.PcloudCloudinstancesGet(params, f.session.AuthInfo(f.cloudInstanceID))
 	if err != nil {
-		return nil, fmt.Errorf(errors.GetCloudInstanceOperationFailed, id, err)
+		return nil, ibmpisession.SDKFailWithAPIError(err, fmt.Errorf(errors.GetCloudInstanceOperationFailed, id, err))
 	}
 	if resp == nil || resp.Payload == nil {
 		return nil, fmt.Errorf("failed to Get Cloud Instance %s", id)
@@ -39,14 +38,14 @@ func (f *IBMPICloudInstanceClient) Get(id string) (*models.CloudInstance, error)
 	return resp.Payload, nil
 }
 
-// Update a cloud instance
+// Update a Cloud Instance
 func (f *IBMPICloudInstanceClient) Update(id string, body *models.CloudInstanceUpdate) (*models.CloudInstance, error) {
 	params := p_cloud_instances.NewPcloudCloudinstancesPutParams().
 		WithContext(f.ctx).WithTimeout(helpers.PIUpdateTimeOut).
 		WithCloudInstanceID(id).WithBody(body)
 	resp, err := f.session.Power.PCloudInstances.PcloudCloudinstancesPut(params, f.session.AuthInfo(f.cloudInstanceID))
 	if err != nil {
-		return nil, fmt.Errorf(errors.UpdateCloudInstanceOperationFailed, id, err)
+		return nil, ibmpisession.SDKFailWithAPIError(err, fmt.Errorf(errors.UpdateCloudInstanceOperationFailed, id, err))
 	}
 	if resp == nil || resp.Payload == nil {
 		return nil, fmt.Errorf("failed to update the Cloud instance %s", id)
@@ -54,7 +53,7 @@ func (f *IBMPICloudInstanceClient) Update(id string, body *models.CloudInstanceU
 	return resp.Payload, nil
 }
 
-// Delete a Cloud instance
+// Delete a Cloud Instance
 func (f *IBMPICloudInstanceClient) Delete(id string) error {
 	params := p_cloud_instances.NewPcloudCloudinstancesDeleteParams().
 		WithContext(f.ctx).WithTimeout(helpers.PIDeleteTimeOut).
