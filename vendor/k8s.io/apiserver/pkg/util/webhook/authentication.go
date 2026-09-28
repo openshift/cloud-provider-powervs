@@ -18,9 +18,9 @@ package webhook
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -29,13 +29,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apiserver/pkg/features"
 	egressselector "k8s.io/apiserver/pkg/server/egressselector"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/component-base/traces"
+	tracing "k8s.io/component-base/tracing"
 )
 
 // AuthenticationInfoResolverWrapper can be used to inject Dial function to the
@@ -47,7 +45,7 @@ func NewDefaultAuthenticationInfoResolverWrapper(
 	proxyTransport *http.Transport,
 	egressSelector *egressselector.EgressSelector,
 	kubeapiserverClientConfig *rest.Config,
-	tp *trace.TracerProvider) AuthenticationInfoResolverWrapper {
+	tp trace.TracerProvider) AuthenticationInfoResolverWrapper {
 
 	webhookAuthResolverWrapper := func(delegate AuthenticationInfoResolver) AuthenticationInfoResolver {
 		return &AuthenticationInfoResolverDelegator{
@@ -59,9 +57,7 @@ func NewDefaultAuthenticationInfoResolverWrapper(
 				if err != nil {
 					return nil, err
 				}
-				if feature.DefaultFeatureGate.Enabled(features.APIServerTracing) {
-					ret.Wrap(traces.WrapperFor(tp))
-				}
+				ret.Wrap(tracing.WrapperFor(tp))
 
 				if egressSelector != nil {
 					networkContext := egressselector.ControlPlane.AsNetworkContext()
@@ -84,9 +80,7 @@ func NewDefaultAuthenticationInfoResolverWrapper(
 				if err != nil {
 					return nil, err
 				}
-				if feature.DefaultFeatureGate.Enabled(features.APIServerTracing) {
-					ret.Wrap(traces.WrapperFor(tp))
-				}
+				ret.Wrap(tracing.WrapperFor(tp))
 
 				if egressSelector != nil {
 					networkContext := egressselector.Cluster.AsNetworkContext()
@@ -233,7 +227,7 @@ func restConfigFromKubeconfig(configAuthInfo *clientcmdapi.AuthInfo) (*rest.Conf
 		config.BearerToken = configAuthInfo.Token
 		config.BearerTokenFile = configAuthInfo.TokenFile
 	} else if len(configAuthInfo.TokenFile) > 0 {
-		tokenBytes, err := ioutil.ReadFile(configAuthInfo.TokenFile)
+		tokenBytes, err := os.ReadFile(configAuthInfo.TokenFile)
 		if err != nil {
 			return nil, err
 		}
@@ -243,6 +237,7 @@ func restConfigFromKubeconfig(configAuthInfo *clientcmdapi.AuthInfo) (*rest.Conf
 	if len(configAuthInfo.Impersonate) > 0 {
 		config.Impersonate = rest.ImpersonationConfig{
 			UserName: configAuthInfo.Impersonate,
+			UID:      configAuthInfo.ImpersonateUID,
 			Groups:   configAuthInfo.ImpersonateGroups,
 			Extra:    configAuthInfo.ImpersonateUserExtra,
 		}
