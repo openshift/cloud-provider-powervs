@@ -72,10 +72,7 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 		oldNodeCopy := oldNode
 		updated := false
 		for _, taint := range taints {
-			curNewNode, ok, err := addOrUpdateTaint(oldNodeCopy, taint)
-			if err != nil {
-				return fmt.Errorf("failed to update taint of node")
-			}
+			curNewNode, ok := addOrUpdateTaint(oldNodeCopy, taint)
 			updated = updated || ok
 			newNode = curNewNode
 			oldNodeCopy = curNewNode
@@ -89,9 +86,14 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 
 // PatchNodeTaints patches node's taints.
 func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, newNode *v1.Node) error {
-	oldData, err := json.Marshal(oldNode)
+	// Strip base diff node from RV to ensure that our Patch request will set RV to check for conflicts over .spec.taints.
+	// This is needed because .spec.taints does not specify patchMergeKey and patchStrategy and adding them is no longer an option for compatibility reasons.
+	// Using other Patch strategy works for adding new taints, however will not resolve problem with taint removal.
+	oldNodeNoRV := oldNode.DeepCopy()
+	oldNodeNoRV.ResourceVersion = ""
+	oldDataNoRV, err := json.Marshal(&oldNodeNoRV)
 	if err != nil {
-		return fmt.Errorf("failed to marshal old node %#v for node %q: %v", oldNode, nodeName, err)
+		return fmt.Errorf("failed to marshal old node %#v for node %q: %v", oldNodeNoRV, nodeName, err)
 	}
 
 	newTaints := newNode.Spec.Taints
@@ -102,7 +104,7 @@ func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, n
 		return fmt.Errorf("failed to marshal new node %#v for node %q: %v", newNodeClone, nodeName, err)
 	}
 
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldDataNoRV, newData, v1.Node{})
 	if err != nil {
 		return fmt.Errorf("failed to create patch for node %q: %v", nodeName, err)
 	}
@@ -113,7 +115,7 @@ func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, n
 
 // addOrUpdateTaint tries to add a taint to annotations list. Returns a new copy of updated Node and true if something was updated
 // false otherwise.
-func addOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
+func addOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool) {
 	newNode := node.DeepCopy()
 	nodeTaints := newNode.Spec.Taints
 
@@ -122,7 +124,7 @@ func addOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
 	for i := range nodeTaints {
 		if taint.MatchTaint(&nodeTaints[i]) {
 			if equality.Semantic.DeepEqual(*taint, nodeTaints[i]) {
-				return newNode, false, nil
+				return newNode, false
 			}
 			newTaints = append(newTaints, *taint)
 			updated = true
@@ -137,7 +139,7 @@ func addOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
 	}
 
 	newNode.Spec.Taints = newTaints
-	return newNode, true, nil
+	return newNode, true
 }
 
 // RemoveTaintOffNode is for cleaning up taints temporarily added to node,
@@ -182,10 +184,7 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, t
 		oldNodeCopy := oldNode
 		updated := false
 		for _, taint := range taints {
-			curNewNode, ok, err := removeTaint(oldNodeCopy, taint)
-			if err != nil {
-				return fmt.Errorf("failed to remove taint of node")
-			}
+			curNewNode, ok := removeTaint(oldNodeCopy, taint)
 			updated = updated || ok
 			newNode = curNewNode
 			oldNodeCopy = curNewNode
@@ -209,20 +208,20 @@ func taintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 
 // removeTaint tries to remove a taint from annotations list. Returns a new copy of updated Node and true if something was updated
 // false otherwise.
-func removeTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
+func removeTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool) {
 	newNode := node.DeepCopy()
 	nodeTaints := newNode.Spec.Taints
 	if len(nodeTaints) == 0 {
-		return newNode, false, nil
+		return newNode, false
 	}
 
 	if !taintExists(nodeTaints, taint) {
-		return newNode, false, nil
+		return newNode, false
 	}
 
 	newTaints, _ := deleteTaint(nodeTaints, taint)
 	newNode.Spec.Taints = newTaints
-	return newNode, true, nil
+	return newNode, true
 }
 
 // deleteTaint removes all the taints that have the same key and effect to given taintToDelete.
