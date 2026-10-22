@@ -165,7 +165,7 @@ func (sh *suffixHandler) constructBytes(base, exponent int32, format Format) (s 
 		if exponent == 0 {
 			return nil, true
 		}
-		result := make([]byte, 8, 8)
+		result := make([]byte, 8)
 		result[0] = 'e'
 		number := strconv.AppendInt(result[1:1], int64(exponent), 10)
 		if &result[1] == &number[0] {
@@ -191,6 +191,8 @@ func (sh *suffixHandler) interpret(suffix suffix) (base, exponent int32, fmt For
 		if err != nil {
 			return 0, 0, DecimalExponent, false
 		}
+		// Stored objects keep the spelling they were given, so narrowing
+		// rather than rejecting is what keeps them decodable.
 		return 10, int32(parsed), DecimalExponent, true
 	}
 

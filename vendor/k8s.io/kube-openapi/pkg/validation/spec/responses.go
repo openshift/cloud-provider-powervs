@@ -16,10 +16,12 @@ package spec
 
 import (
 	"encoding/json"
-	"reflect"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
+	"fmt"
 	"strconv"
 
-	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
 )
 
 // Responses is a container for the expected responses of an operation.
@@ -42,30 +44,31 @@ type Responses struct {
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
 func (r *Responses) UnmarshalJSON(data []byte) error {
-	if err := json.Unmarshal(data, &r.ResponsesProps); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &r.VendorExtensible); err != nil {
-		return err
-	}
-	if reflect.DeepEqual(ResponsesProps{}, r.ResponsesProps) {
-		r.ResponsesProps = ResponsesProps{}
-	}
-	return nil
+	return jsonv2.Unmarshal(data, r)
 }
 
 // MarshalJSON converts this items object to JSON
 func (r Responses) MarshalJSON() ([]byte, error) {
-	b1, err := json.Marshal(r.ResponsesProps)
-	if err != nil {
-		return nil, err
+	return internal.DeterministicMarshal(r)
+}
+
+func (r Responses) MarshalJSONTo(enc *jsontext.Encoder) error {
+	type ArbitraryKeys map[string]interface{}
+	var x struct {
+		ArbitraryKeys ArbitraryKeys `json:",embed"`
+		Default       *Response     `json:"default,omitempty"`
 	}
-	b2, err := json.Marshal(r.VendorExtensible)
-	if err != nil {
-		return nil, err
+	x.ArbitraryKeys = make(map[string]any, len(r.Extensions)+len(r.StatusCodeResponses))
+	for k, v := range r.Extensions {
+		if internal.IsExtensionKey(k) {
+			x.ArbitraryKeys[k] = v
+		}
 	}
-	concated := swag.ConcatJSON(b1, b2)
-	return concated, nil
+	for k, v := range r.StatusCodeResponses {
+		x.ArbitraryKeys[strconv.Itoa(k)] = v
+	}
+	x.Default = r.Default
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 // ResponsesProps describes all responses for an operation.
@@ -90,21 +93,62 @@ func (r ResponsesProps) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON unmarshals responses from JSON
 func (r *ResponsesProps) UnmarshalJSON(data []byte) error {
-	var res map[string]Response
-	if err := json.Unmarshal(data, &res); err != nil {
-		return nil
+	return jsonv2.Unmarshal(data, r)
+}
+
+func (r *Responses) UnmarshalJSONFrom(dec *jsontext.Decoder) (err error) {
+	tok, err := dec.ReadToken()
+	if err != nil {
+		return err
 	}
-	if v, ok := res["default"]; ok {
-		r.Default = &v
-		delete(res, "default")
-	}
-	for k, v := range res {
-		if nk, err := strconv.Atoi(k); err == nil {
-			if r.StatusCodeResponses == nil {
-				r.StatusCodeResponses = map[int]Response{}
+	var ext any
+	var resp Response
+	switch k := tok.Kind(); k {
+	case 'n':
+		return nil // noop
+	case '{':
+		for {
+			tok, err := dec.ReadToken()
+			if err != nil {
+				return err
 			}
-			r.StatusCodeResponses[nk] = v
+			if tok.Kind() == '}' {
+				return nil
+			}
+			switch k := tok.String(); {
+			case internal.IsExtensionKey(k):
+				ext = nil
+				if err := jsonv2.UnmarshalDecode(dec, &ext); err != nil {
+					return err
+				}
+
+				if r.Extensions == nil {
+					r.Extensions = make(map[string]any)
+				}
+				r.Extensions[k] = ext
+			case k == "default":
+				resp = Response{}
+				if err := jsonv2.UnmarshalDecode(dec, &resp); err != nil {
+					return err
+				}
+
+				respCopy := resp
+				r.ResponsesProps.Default = &respCopy
+			default:
+				if nk, err := strconv.Atoi(k); err == nil {
+					resp = Response{}
+					if err := jsonv2.UnmarshalDecode(dec, &resp); err != nil {
+						return err
+					}
+
+					if r.StatusCodeResponses == nil {
+						r.StatusCodeResponses = map[int]Response{}
+					}
+					r.StatusCodeResponses[nk] = resp
+				}
+			}
 		}
+	default:
+		return fmt.Errorf("unknown JSON kind: %v", k)
 	}
-	return nil
 }

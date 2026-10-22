@@ -18,20 +18,20 @@ package rest
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apimachinery/pkg/api/validate/content"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
-	"k8s.io/apimachinery/pkg/api/validation/path"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 )
 
@@ -90,8 +90,15 @@ type RESTCreateStrategy interface {
 	Canonicalize(obj runtime.Object)
 }
 
+func validatePathSegment(name string, prefix bool) []string {
+	if prefix {
+		return content.IsPathSegmentPrefix(name)
+	}
+	return content.IsPathSegmentName(name)
+}
+
 // BeforeCreate ensures that common operations for all resources are performed on creation. It only returns
-// errors that can be converted to api.Status. It invokes PrepareForCreate, then GenerateName, then Validate.
+// errors that can be converted to api.Status. It invokes PrepareForCreate, then Validate.
 // It returns nil if the object should be created.
 func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.Object) error {
 	objectMeta, kind, kerr := objectMetaAndKind(strategy, obj)
@@ -99,40 +106,29 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 		return kerr
 	}
 
-	if strategy.NamespaceScoped() {
-		if !ValidNamespace(ctx, objectMeta) {
-			return errors.NewBadRequest("the namespace of the provided object does not match the namespace sent on the request")
-		}
-	} else if len(objectMeta.GetNamespace()) > 0 {
-		objectMeta.SetNamespace(metav1.NamespaceNone)
+	// ensure that system-critical metadata has been populated
+	if !metav1.HasObjectMetaSystemFieldValues(objectMeta) {
+		return errors.NewInternalError(fmt.Errorf("system metadata was not initialized"))
 	}
-	objectMeta.SetDeletionTimestamp(nil)
-	objectMeta.SetDeletionGracePeriodSeconds(nil)
-	strategy.PrepareForCreate(ctx, obj)
-	FillObjectMetaSystemFields(objectMeta)
 
+	// ensure the name has been generated
 	if len(objectMeta.GetGenerateName()) > 0 && len(objectMeta.GetName()) == 0 {
-		objectMeta.SetName(strategy.GenerateName(objectMeta.GetGenerateName()))
+		return errors.NewInternalError(fmt.Errorf("metadata.name was not generated"))
 	}
 
-	// Ensure managedFields is not set unless the feature is enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-		objectMeta.SetManagedFields(nil)
+	// ensure namespace on the object is correct, or error if a conflicting namespace was set in the object
+	requestNamespace, ok := genericapirequest.NamespaceFrom(ctx)
+	if !ok {
+		return errors.NewInternalError(fmt.Errorf("no namespace information found in request context"))
+	}
+	if err := EnsureObjectNamespaceMatchesRequestNamespace(ExpectedNamespaceForScope(requestNamespace, strategy.NamespaceScoped()), objectMeta); err != nil {
+		return err
 	}
 
-	// ClusterName is ignored and should not be saved
-	if len(objectMeta.GetClusterName()) > 0 {
-		objectMeta.SetClusterName("")
-	}
+	strategy.PrepareForCreate(ctx, obj)
 
-	if errs := strategy.Validate(ctx, obj); len(errs) > 0 {
-		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)
-	}
-
-	// Custom validation (including name validation) passed
-	// Now run common validation on object meta
-	// Do this *after* custom validation so that specific error messages are shown whenever possible
-	if errs := genericvalidation.ValidateObjectMetaAccessor(objectMeta, strategy.NamespaceScoped(), path.ValidatePathSegmentName, field.NewPath("metadata")); len(errs) > 0 {
+	errs := ValidateCreate(ctx, obj, strategy)
+	if len(errs) != 0 {
 		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)
 	}
 
@@ -143,6 +139,31 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 	strategy.Canonicalize(obj)
 
 	return nil
+}
+
+// ValidateCreate performs common and strategy-specific validation for a create operation.
+func ValidateCreate(ctx context.Context, obj runtime.Object, strategy RESTCreateStrategy) field.ErrorList {
+	errs := strategy.Validate(ctx, obj)
+
+	if len(errs) == 0 {
+		objectMeta, err := meta.Accessor(obj)
+		if err != nil {
+			return append(errs, field.InternalError(field.NewPath("metadata"), fmt.Errorf("failed to get object metadata: %w", err)))
+		}
+
+		// TODO: Replace this check with the ObjectMeta name validation (validatePathSegment) once we are sure that all other validations are covered by strategy.Validate and strategy.ValidateDeclaratively.
+
+		// Custom validation (including name validation) passed
+		// Now run common validation on object meta
+		// Do this *after* custom validation so that specific error messages are shown whenever possible
+		errs = append(errs, genericvalidation.ValidateObjectMetaAccessor(objectMeta, strategy.NamespaceScoped(), validatePathSegment, field.NewPath("metadata"))...)
+	}
+
+	if dv, ok := strategy.(DeclarativeValidationStrategy); ok {
+		errs = dv.ValidateDeclaratively(ctx, obj, nil, errs, operation.Create, dv.DeclarativeValidationConfig(ctx, obj, nil))
+	}
+
+	return errs
 }
 
 // CheckGeneratedNameError checks whether an error that occurred creating a resource is due

@@ -16,11 +16,13 @@ package spec
 
 import (
 	"encoding/json"
-	"fmt"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"net/url"
-	"strings"
 
-	"github.com/go-openapi/swag"
+	"github.com/go-openapi/jsonpointer/jsonname"
+
+	"k8s.io/kube-openapi/pkg/internal"
 )
 
 // BooleanProperty creates a boolean property
@@ -194,11 +196,60 @@ type SchemaProps struct {
 	Definitions          Definitions       `json:"definitions,omitempty"`
 }
 
+// Marshaling structure only, always edit along with corresponding
+// struct (or compilation will fail).
+type schemaPropsOmitZero struct {
+	ID                   string            `json:"id,omitempty"`
+	Ref                  Ref               `json:"-"`
+	Schema               SchemaURL         `json:"-"`
+	Description          string            `json:"description,omitempty"`
+	Type                 StringOrArray     `json:"type,omitzero"`
+	Nullable             bool              `json:"nullable,omitzero"`
+	Format               string            `json:"format,omitempty"`
+	Title                string            `json:"title,omitempty"`
+	Default              interface{}       `json:"default,omitzero"`
+	Maximum              *float64          `json:"maximum,omitempty"`
+	ExclusiveMaximum     bool              `json:"exclusiveMaximum,omitzero"`
+	Minimum              *float64          `json:"minimum,omitempty"`
+	ExclusiveMinimum     bool              `json:"exclusiveMinimum,omitzero"`
+	MaxLength            *int64            `json:"maxLength,omitempty"`
+	MinLength            *int64            `json:"minLength,omitempty"`
+	Pattern              string            `json:"pattern,omitempty"`
+	MaxItems             *int64            `json:"maxItems,omitempty"`
+	MinItems             *int64            `json:"minItems,omitempty"`
+	UniqueItems          bool              `json:"uniqueItems,omitzero"`
+	MultipleOf           *float64          `json:"multipleOf,omitempty"`
+	Enum                 []interface{}     `json:"enum,omitempty"`
+	MaxProperties        *int64            `json:"maxProperties,omitempty"`
+	MinProperties        *int64            `json:"minProperties,omitempty"`
+	Required             []string          `json:"required,omitempty"`
+	Items                *SchemaOrArray    `json:"items,omitzero"`
+	AllOf                []Schema          `json:"allOf,omitempty"`
+	OneOf                []Schema          `json:"oneOf,omitempty"`
+	AnyOf                []Schema          `json:"anyOf,omitempty"`
+	Not                  *Schema           `json:"not,omitzero"`
+	Properties           map[string]Schema `json:"properties,omitempty"`
+	AdditionalProperties *SchemaOrBool     `json:"additionalProperties,omitzero"`
+	PatternProperties    map[string]Schema `json:"patternProperties,omitempty"`
+	Dependencies         Dependencies      `json:"dependencies,omitempty"`
+	AdditionalItems      *SchemaOrBool     `json:"additionalItems,omitzero"`
+	Definitions          Definitions       `json:"definitions,omitempty"`
+}
+
 // SwaggerSchemaProps are additional properties supported by swagger schemas, but not JSON-schema (draft 4)
 type SwaggerSchemaProps struct {
 	Discriminator string                 `json:"discriminator,omitempty"`
 	ReadOnly      bool                   `json:"readOnly,omitempty"`
 	ExternalDocs  *ExternalDocumentation `json:"externalDocs,omitempty"`
+	Example       interface{}            `json:"example,omitempty"`
+}
+
+// Marshaling structure only, always edit along with corresponding
+// struct (or compilation will fail).
+type swaggerSchemaPropsOmitZero struct {
+	Discriminator string                 `json:"discriminator,omitempty"`
+	ReadOnly      bool                   `json:"readOnly,omitzero"`
+	ExternalDocs  *ExternalDocumentation `json:"externalDocs,omitzero"`
 	Example       interface{}            `json:"example,omitempty"`
 }
 
@@ -432,82 +483,70 @@ func (s *Schema) WithExternalDocs(description, url string) *Schema {
 
 // MarshalJSON marshal this to JSON
 func (s Schema) MarshalJSON() ([]byte, error) {
-	b1, err := json.Marshal(s.SchemaProps)
-	if err != nil {
-		return nil, fmt.Errorf("schema props %v", err)
+	return internal.DeterministicMarshal(s)
+}
+
+func (s Schema) MarshalJSONTo(enc *jsontext.Encoder) error {
+	type ArbitraryKeys map[string]interface{}
+	var x struct {
+		ArbitraryKeys      ArbitraryKeys              `json:",embed"`
+		SchemaProps        schemaPropsOmitZero        `json:",embed"`
+		SwaggerSchemaProps swaggerSchemaPropsOmitZero `json:",embed"`
+		Schema             string                     `json:"$schema,omitempty"`
+		Ref                string                     `json:"$ref,omitempty"`
 	}
-	b2, err := json.Marshal(s.VendorExtensible)
-	if err != nil {
-		return nil, fmt.Errorf("vendor props %v", err)
-	}
-	b3, err := s.Ref.MarshalJSON()
-	if err != nil {
-		return nil, fmt.Errorf("ref prop %v", err)
-	}
-	b4, err := s.Schema.MarshalJSON()
-	if err != nil {
-		return nil, fmt.Errorf("schema prop %v", err)
-	}
-	b5, err := json.Marshal(s.SwaggerSchemaProps)
-	if err != nil {
-		return nil, fmt.Errorf("common validations %v", err)
-	}
-	var b6 []byte
-	if s.ExtraProps != nil {
-		jj, err := json.Marshal(s.ExtraProps)
-		if err != nil {
-			return nil, fmt.Errorf("extra props %v", err)
+	x.ArbitraryKeys = make(map[string]any, len(s.Extensions)+len(s.ExtraProps))
+	for k, v := range s.Extensions {
+		if internal.IsExtensionKey(k) {
+			x.ArbitraryKeys[k] = v
 		}
-		b6 = jj
 	}
-	return swag.ConcatJSON(b1, b2, b3, b4, b5, b6), nil
+	for k, v := range s.ExtraProps {
+		x.ArbitraryKeys[k] = v
+	}
+	x.SchemaProps = schemaPropsOmitZero(s.SchemaProps)
+	x.SwaggerSchemaProps = swaggerSchemaPropsOmitZero(s.SwaggerSchemaProps)
+	x.Ref = s.Ref.String()
+	x.Schema = string(s.Schema)
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 // UnmarshalJSON marshal this from JSON
 func (s *Schema) UnmarshalJSON(data []byte) error {
-	props := struct {
+	return jsonv2.Unmarshal(data, s)
+}
+
+func (s *Schema) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	var x struct {
+		Extensions Extensions `json:",embed"`
 		SchemaProps
 		SwaggerSchemaProps
-	}{}
-	if err := json.Unmarshal(data, &props); err != nil {
+	}
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
 
-	sch := Schema{
-		SchemaProps:        props.SchemaProps,
-		SwaggerSchemaProps: props.SwaggerSchemaProps,
-	}
-
-	var d map[string]interface{}
-	if err := json.Unmarshal(data, &d); err != nil {
+	if err := x.Ref.fromMap(x.Extensions); err != nil {
 		return err
 	}
 
-	_ = sch.Ref.fromMap(d)
-	_ = sch.Schema.fromMap(d)
-
-	delete(d, "$ref")
-	delete(d, "$schema")
-	for _, pn := range swag.DefaultJSONNameProvider.GetJSONNames(s) {
-		delete(d, pn)
+	if err := x.Schema.fromMap(x.Extensions); err != nil {
+		return err
 	}
 
-	for k, vv := range d {
-		lk := strings.ToLower(k)
-		if strings.HasPrefix(lk, "x-") {
-			if sch.Extensions == nil {
-				sch.Extensions = map[string]interface{}{}
-			}
-			sch.Extensions[k] = vv
-			continue
-		}
-		if sch.ExtraProps == nil {
-			sch.ExtraProps = map[string]interface{}{}
-		}
-		sch.ExtraProps[k] = vv
+	delete(x.Extensions, "$ref")
+	delete(x.Extensions, "$schema")
+
+	for _, pn := range jsonname.DefaultJSONNameProvider.GetJSONNames(s) {
+		delete(x.Extensions, pn)
+	}
+	if len(x.Extensions) == 0 {
+		x.Extensions = nil
 	}
 
-	*s = sch
-
+	s.ExtraProps = x.Extensions.sanitizeWithExtra()
+	s.Extensions = internal.SanitizeExtensions(x.Extensions)
+	s.SchemaProps = x.SchemaProps
+	s.SwaggerSchemaProps = x.SwaggerSchemaProps
 	return nil
 }

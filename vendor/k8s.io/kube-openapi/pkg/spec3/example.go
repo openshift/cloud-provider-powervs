@@ -17,10 +17,11 @@ limitations under the License.
 package spec3
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 
+	"k8s.io/kube-openapi/pkg/internal"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	"github.com/go-openapi/swag"
 )
 
 // Example https://swagger.io/specification/#example-object
@@ -33,31 +34,38 @@ type Example struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode RequestBody as JSON
 func (e *Example) MarshalJSON() ([]byte, error) {
-	b1, err := json.Marshal(e.Refable)
-	if err != nil {
-		return nil, err
+	return internal.DeterministicMarshal(e)
+}
+func (e *Example) MarshalJSONTo(enc *jsontext.Encoder) error {
+	var x struct {
+		Ref          string `json:"$ref,omitempty"`
+		ExampleProps `json:",embed"`
+		Extensions   spec.Extensions `json:",embed"`
 	}
-	b2, err := json.Marshal(e.ExampleProps)
-	if err != nil {
-		return nil, err
-	}
-	b3, err := json.Marshal(e.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	return swag.ConcatJSON(b1, b2, b3), nil
+	x.Ref = e.Refable.Ref.String()
+	x.Extensions = internal.SanitizeExtensions(e.Extensions)
+	x.ExampleProps = e.ExampleProps
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 func (e *Example) UnmarshalJSON(data []byte) error {
-	if err := json.Unmarshal(data, &e.Refable); err != nil {
+	return jsonv2.Unmarshal(data, e)
+}
+
+func (e *Example) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	var x struct {
+		Extensions spec.Extensions `json:",embed"`
+		ExampleProps
+	}
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &e.ExampleProps); err != nil {
+	if err := internal.JSONRefFromMap(&e.Ref.Ref, x.Extensions); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &e.VendorExtensible); err != nil {
-		return err
-	}
+	e.Extensions = internal.SanitizeExtensions(x.Extensions)
+	e.ExampleProps = x.ExampleProps
+
 	return nil
 }
 

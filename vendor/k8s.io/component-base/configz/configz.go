@@ -18,25 +18,37 @@ limitations under the License.
 //
 // Each component that wants to serve its ComponentConfig creates a Config
 // object, and the program should call InstallHandler once. e.g.,
-//  func main() {
-//  	boatConfig := getBoatConfig()
-//  	planeConfig := getPlaneConfig()
 //
-//  	bcz, err := configz.New("boat")
-//  	if err != nil {
-//  		panic(err)
-//  	}
-//  	bcz.Set(boatConfig)
+//	func main() {
+//		if err := setupConfigz(); err != nil {
+//			klog.Fatalf("Failed to setup configz: %v", err)
+//		}
+//		http.ListenAndServe(":8080", http.DefaultServeMux)
+//	}
 //
-//  	pcz, err := configz.New("plane")
-//  	if err != nil {
-//  		panic(err)
-//  	}
-//  	pcz.Set(planeConfig)
+//	func setupConfigz() error {
+//		boatConfig := getBoatConfig()
+//		planeConfig := getPlaneConfig()
 //
-//  	configz.InstallHandler(http.DefaultServeMux)
-//  	http.ListenAndServe(":8080", http.DefaultServeMux)
-//  }
+//		bcz, err := configz.New("boat")
+//		if err != nil {
+//			return fmt.Errorf("unable to register boat config: %w", err)
+//		}
+//		if err := bcz.Set(boatConfig); err != nil {
+//			return fmt.Errorf("unable to set boat config: %w", err)
+//		}
+//
+//		pcz, err := configz.New("plane")
+//		if err != nil {
+//			return fmt.Errorf("unable to register plane config: %w", err)
+//		}
+//		if err := pcz.Set(planeConfig); err != nil {
+//			return fmt.Errorf("unable to set plane config: %w", err)
+//		}
+//
+//		configz.InstallHandler(http.DefaultServeMux)
+//		return nil
+//	}
 package configz
 
 import (
@@ -44,7 +56,11 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+
+	"k8s.io/apimachinery/pkg/runtime"
 )
+
+const DefaultConfigzPath = "/configz"
 
 var (
 	configsGuard sync.RWMutex
@@ -54,13 +70,13 @@ var (
 // Config is a handle to a ComponentConfig object. Don't create these directly;
 // use New() instead.
 type Config struct {
-	val interface{}
+	val runtime.Object
 }
 
 // InstallHandler adds an HTTP handler on the given mux for the "/configz"
 // endpoint which serves all registered ComponentConfigs in JSON format.
 func InstallHandler(m mux) {
-	m.Handle("/configz", http.HandlerFunc(handle))
+	m.Handle(DefaultConfigzPath, http.HandlerFunc(handle))
 }
 
 type mux interface {
@@ -89,10 +105,24 @@ func Delete(name string) {
 }
 
 // Set sets the ComponentConfig for this Config.
-func (v *Config) Set(val interface{}) {
+func (v *Config) Set(val runtime.Object) error {
 	configsGuard.Lock()
 	defer configsGuard.Unlock()
+	if val == nil {
+		return fmt.Errorf("val may not be nil")
+	}
+	gvk := val.GetObjectKind().GroupVersionKind()
+	if len(gvk.Kind) == 0 {
+		return fmt.Errorf("val must specify a kind")
+	}
+	if gvk.GroupVersion().Empty() {
+		return fmt.Errorf("val must specify a group/version")
+	}
+	if gvk.Version == runtime.APIVersionInternal {
+		return fmt.Errorf("val must specify an external version")
+	}
 	v.val = val
+	return nil
 }
 
 // MarshalJSON marshals the ComponentConfig as JSON data.

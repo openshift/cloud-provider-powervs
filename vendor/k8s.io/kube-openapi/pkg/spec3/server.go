@@ -17,10 +17,11 @@ limitations under the License.
 package spec3
 
 import (
-	"encoding/json"
-	"k8s.io/kube-openapi/pkg/validation/spec"
-	"github.com/go-openapi/swag"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 
+	"k8s.io/kube-openapi/pkg/internal"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 type Server struct {
@@ -39,24 +40,34 @@ type ServerProps struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode Responses as JSON
 func (s *Server) MarshalJSON() ([]byte, error) {
-	b1, err := json.Marshal(s.ServerProps)
-	if err != nil {
-		return nil, err
+	return internal.DeterministicMarshal(s)
+}
+
+func (s *Server) MarshalJSONTo(enc *jsontext.Encoder) error {
+	var x struct {
+		ServerProps `json:",embed"`
+		Extensions  spec.Extensions `json:",embed"`
 	}
-	b2, err := json.Marshal(s.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	return swag.ConcatJSON(b1, b2), nil
+	x.Extensions = internal.SanitizeExtensions(s.Extensions)
+	x.ServerProps = s.ServerProps
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 func (s *Server) UnmarshalJSON(data []byte) error {
-	if err := json.Unmarshal(data, &s.ServerProps); err != nil {
+	return jsonv2.Unmarshal(data, s)
+}
+
+func (s *Server) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	var x struct {
+		Extensions spec.Extensions `json:",embed"`
+		ServerProps
+	}
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &s.VendorExtensible); err != nil {
-		return err
-	}
+	s.Extensions = internal.SanitizeExtensions(x.Extensions)
+	s.ServerProps = x.ServerProps
+
 	return nil
 }
 
@@ -76,23 +87,33 @@ type ServerVariableProps struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode Responses as JSON
 func (s *ServerVariable) MarshalJSON() ([]byte, error) {
-	b1, err := json.Marshal(s.ServerVariableProps)
-	if err != nil {
-		return nil, err
+	return internal.DeterministicMarshal(s)
+}
+
+func (s *ServerVariable) MarshalJSONTo(enc *jsontext.Encoder) error {
+	var x struct {
+		ServerVariableProps `json:",embed"`
+		Extensions          spec.Extensions `json:",embed"`
 	}
-	b2, err := json.Marshal(s.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	return swag.ConcatJSON(b1, b2), nil
+	x.Extensions = internal.SanitizeExtensions(s.Extensions)
+	x.ServerVariableProps = s.ServerVariableProps
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 func (s *ServerVariable) UnmarshalJSON(data []byte) error {
-	if err := json.Unmarshal(data, &s.ServerVariableProps); err != nil {
+	return jsonv2.Unmarshal(data, s)
+}
+
+func (s *ServerVariable) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	var x struct {
+		Extensions spec.Extensions `json:",embed"`
+		ServerVariableProps
+	}
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &s.VendorExtensible); err != nil {
-		return err
-	}
+	s.Extensions = internal.SanitizeExtensions(x.Extensions)
+	s.ServerVariableProps = x.ServerVariableProps
+
 	return nil
 }

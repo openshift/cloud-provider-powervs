@@ -17,9 +17,10 @@ limitations under the License.
 package spec3
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 
-	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -34,32 +35,38 @@ type Parameter struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode Parameter as JSON
 func (p *Parameter) MarshalJSON() ([]byte, error) {
-	b1, err := json.Marshal(p.Refable)
-	if err != nil {
-		return nil, err
+	return internal.DeterministicMarshal(p)
+}
+
+func (p *Parameter) MarshalJSONTo(enc *jsontext.Encoder) error {
+	var x struct {
+		Ref            string                 `json:"$ref,omitempty"`
+		ParameterProps parameterPropsOmitZero `json:",embed"`
+		Extensions     spec.Extensions        `json:",embed"`
 	}
-	b2, err := json.Marshal(p.ParameterProps)
-	if err != nil {
-		return nil, err
-	}
-	b3, err := json.Marshal(p.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	return swag.ConcatJSON(b1, b2, b3), nil
+	x.Ref = p.Refable.Ref.String()
+	x.Extensions = internal.SanitizeExtensions(p.Extensions)
+	x.ParameterProps = parameterPropsOmitZero(p.ParameterProps)
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 func (p *Parameter) UnmarshalJSON(data []byte) error {
-	if err := json.Unmarshal(data, &p.Refable); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &p.ParameterProps); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &p.VendorExtensible); err != nil {
-		return err
-	}
+	return jsonv2.Unmarshal(data, p)
+}
 
+func (p *Parameter) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	var x struct {
+		Extensions spec.Extensions `json:",embed"`
+		ParameterProps
+	}
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
+		return err
+	}
+	if err := internal.JSONRefFromMap(&p.Ref.Ref, x.Extensions); err != nil {
+		return err
+	}
+	p.Extensions = internal.SanitizeExtensions(x.Extensions)
+	p.ParameterProps = x.ParameterProps
 	return nil
 }
 
@@ -91,4 +98,20 @@ type ParameterProps struct {
 	Example interface{} `json:"example,omitempty"`
 	// Examples of the parameter's potential value. Each example SHOULD contain a value in the correct format as specified in the parameter encoding
 	Examples map[string]*Example `json:"examples,omitempty"`
+}
+
+type parameterPropsOmitZero struct {
+	Name            string                `json:"name,omitempty"`
+	In              string                `json:"in,omitempty"`
+	Description     string                `json:"description,omitempty"`
+	Required        bool                  `json:"required,omitzero"`
+	Deprecated      bool                  `json:"deprecated,omitzero"`
+	AllowEmptyValue bool                  `json:"allowEmptyValue,omitzero"`
+	Style           string                `json:"style,omitempty"`
+	Explode         bool                  `json:"explode,omitzero"`
+	AllowReserved   bool                  `json:"allowReserved,omitzero"`
+	Schema          *spec.Schema          `json:"schema,omitzero"`
+	Content         map[string]*MediaType `json:"content,omitempty"`
+	Example         interface{}           `json:"example,omitempty"`
+	Examples        map[string]*Example   `json:"examples,omitempty"`
 }

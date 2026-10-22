@@ -17,11 +17,13 @@ limitations under the License.
 package spec3
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
+	"fmt"
 	"strings"
 
+	"k8s.io/kube-openapi/pkg/internal"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	"github.com/go-openapi/swag"
 )
 
 // Paths describes the available paths and operations for the API, more at https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#pathsObject
@@ -32,46 +34,80 @@ type Paths struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode Paths as JSON
 func (p *Paths) MarshalJSON() ([]byte, error) {
-	b1, err := json.Marshal(p.Paths)
-	if err != nil {
-		return nil, err
+	return internal.DeterministicMarshal(p)
+}
+
+func (p *Paths) MarshalJSONTo(enc *jsontext.Encoder) error {
+	m := make(map[string]any, len(p.Extensions)+len(p.Paths))
+	for k, v := range p.Extensions {
+		if internal.IsExtensionKey(k) {
+			m[k] = v
+		}
 	}
-	b2, err := json.Marshal(p.VendorExtensible)
-	if err != nil {
-		return nil, err
+	for k, v := range p.Paths {
+		if strings.HasPrefix(k, "/") {
+			m[k] = v
+		}
 	}
-	return swag.ConcatJSON(b1, b2), nil
+	return jsonv2.MarshalEncode(enc, m)
 }
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
 func (p *Paths) UnmarshalJSON(data []byte) error {
-	var res map[string]json.RawMessage
-	if err := json.Unmarshal(data, &res); err != nil {
+	return jsonv2.Unmarshal(data, p)
+}
+
+func (p *Paths) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	tok, err := dec.ReadToken()
+	if err != nil {
 		return err
 	}
-	for k, v := range res {
-		if strings.HasPrefix(strings.ToLower(k), "x-") {
-			if p.Extensions == nil {
-				p.Extensions = make(map[string]interface{})
-			}
-			var d interface{}
-			if err := json.Unmarshal(v, &d); err != nil {
+	switch k := tok.Kind(); k {
+	case 'n':
+		*p = Paths{}
+		return nil
+	case '{':
+		for {
+			tok, err := dec.ReadToken()
+			if err != nil {
 				return err
 			}
-			p.Extensions[k] = d
-		}
-		if strings.HasPrefix(k, "/") {
-			if p.Paths == nil {
-				p.Paths = make(map[string]*Path)
+
+			if tok.Kind() == '}' {
+				return nil
 			}
-			var pi *Path
-			if err := json.Unmarshal(v, &pi); err != nil {
-				return err
+
+			switch k := tok.String(); {
+			case internal.IsExtensionKey(k):
+				var ext any
+				if err := jsonv2.UnmarshalDecode(dec, &ext); err != nil {
+					return err
+				}
+
+				if p.Extensions == nil {
+					p.Extensions = make(map[string]any)
+				}
+				p.Extensions[k] = ext
+			case len(k) > 0 && k[0] == '/':
+				pi := Path{}
+				if err := jsonv2.UnmarshalDecode(dec, &pi); err != nil {
+					return err
+				}
+
+				if p.Paths == nil {
+					p.Paths = make(map[string]*Path)
+				}
+				p.Paths[k] = &pi
+			default:
+				_, err := dec.ReadValue() // skip value
+				if err != nil {
+					return err
+				}
 			}
-			p.Paths[k] = pi
 		}
+	default:
+		return fmt.Errorf("unknown JSON kind: %v", k)
 	}
-	return nil
 }
 
 // Path describes the operations available on a single path, more at https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#pathItemObject
@@ -85,31 +121,40 @@ type Path struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode Path as JSON
 func (p *Path) MarshalJSON() ([]byte, error) {
-	b1, err := json.Marshal(p.Refable)
-	if err != nil {
-		return nil, err
+	return internal.DeterministicMarshal(p)
+}
+
+func (p *Path) MarshalJSONTo(enc *jsontext.Encoder) error {
+	var x struct {
+		Ref        string          `json:"$ref,omitempty"`
+		Extensions spec.Extensions `json:",embed"`
+		PathProps
 	}
-	b2, err := json.Marshal(p.PathProps)
-	if err != nil {
-		return nil, err
-	}
-	b3, err := json.Marshal(p.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	return swag.ConcatJSON(b1, b2, b3), nil
+	x.Ref = p.Refable.Ref.String()
+	x.Extensions = internal.SanitizeExtensions(p.Extensions)
+	x.PathProps = p.PathProps
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 func (p *Path) UnmarshalJSON(data []byte) error {
-	if err := json.Unmarshal(data, &p.Refable); err != nil {
+	return jsonv2.Unmarshal(data, p)
+}
+
+func (p *Path) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	var x struct {
+		Extensions spec.Extensions `json:",embed"`
+		PathProps
+	}
+
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &p.PathProps); err != nil {
+	if err := internal.JSONRefFromMap(&p.Ref.Ref, x.Extensions); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &p.VendorExtensible); err != nil {
-		return err
-	}
+	p.Extensions = internal.SanitizeExtensions(x.Extensions)
+	p.PathProps = x.PathProps
+
 	return nil
 }
 
