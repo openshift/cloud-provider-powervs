@@ -26,6 +26,7 @@ import (
 
 var _ runtime.Unstructured = &UnstructuredList{}
 var _ metav1.ListInterface = &UnstructuredList{}
+var _ metav1.ShardedListInterface = &UnstructuredList{}
 
 // UnstructuredList allows lists that do not have Golang structs
 // registered to be manipulated generically. This can be used to deal
@@ -46,6 +47,15 @@ func (u *UnstructuredList) IsList() bool { return true }
 func (u *UnstructuredList) EachListItem(fn func(runtime.Object) error) error {
 	for i := range u.Items {
 		if err := fn(&u.Items[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (u *UnstructuredList) EachListItemWithAlloc(fn func(runtime.Object) error) error {
+	for i := range u.Items {
+		if err := fn(&Unstructured{Object: u.Items[i].Object}); err != nil {
 			return err
 		}
 	}
@@ -185,6 +195,22 @@ func (u *UnstructuredList) SetRemainingItemCount(c *int64) {
 		RemoveNestedField(u.Object, "metadata", "remainingItemCount")
 	} else {
 		u.setNestedField(*c, "metadata", "remainingItemCount")
+	}
+}
+
+func (u *UnstructuredList) GetShardInfo() *metav1.ShardInfo {
+	selector, found, err := NestedString(u.Object, "metadata", "shardInfo", "selector")
+	if !found || err != nil {
+		return nil
+	}
+	return &metav1.ShardInfo{Selector: selector}
+}
+
+func (u *UnstructuredList) SetShardInfo(info *metav1.ShardInfo) {
+	if info == nil {
+		RemoveNestedField(u.Object, "metadata", "shardInfo")
+	} else {
+		u.setNestedField(map[string]interface{}{"selector": info.Selector}, "metadata", "shardInfo")
 	}
 }
 

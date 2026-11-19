@@ -17,9 +17,10 @@ limitations under the License.
 package spec3
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 
-	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -34,32 +35,38 @@ type Header struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode Header as JSON
 func (h *Header) MarshalJSON() ([]byte, error) {
-	b1, err := json.Marshal(h.Refable)
-	if err != nil {
-		return nil, err
+	return internal.DeterministicMarshal(h)
+}
+
+func (h *Header) MarshalJSONTo(enc *jsontext.Encoder) error {
+	var x struct {
+		Ref         string              `json:"$ref,omitempty"`
+		HeaderProps headerPropsOmitZero `json:",embed"`
+		Extensions  spec.Extensions     `json:",embed"`
 	}
-	b2, err := json.Marshal(h.HeaderProps)
-	if err != nil {
-		return nil, err
-	}
-	b3, err := json.Marshal(h.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	return swag.ConcatJSON(b1, b2, b3), nil
+	x.Ref = h.Refable.Ref.String()
+	x.Extensions = internal.SanitizeExtensions(h.Extensions)
+	x.HeaderProps = headerPropsOmitZero(h.HeaderProps)
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 func (h *Header) UnmarshalJSON(data []byte) error {
-	if err := json.Unmarshal(data, &h.Refable); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &h.HeaderProps); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &h.VendorExtensible); err != nil {
-		return err
-	}
+	return jsonv2.Unmarshal(data, h)
+}
 
+func (h *Header) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	var x struct {
+		Extensions spec.Extensions `json:",embed"`
+		HeaderProps
+	}
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
+		return err
+	}
+	if err := internal.JSONRefFromMap(&h.Ref.Ref, x.Extensions); err != nil {
+		return err
+	}
+	h.Extensions = internal.SanitizeExtensions(x.Extensions)
+	h.HeaderProps = x.HeaderProps
 	return nil
 }
 
@@ -87,4 +94,20 @@ type HeaderProps struct {
 	Example interface{} `json:"example,omitempty"`
 	// Examples of the header
 	Examples map[string]*Example `json:"examples,omitempty"`
+}
+
+// Marshaling structure only, always edit along with corresponding
+// struct (or compilation will fail).
+type headerPropsOmitZero struct {
+	Description     string                `json:"description,omitempty"`
+	Required        bool                  `json:"required,omitzero"`
+	Deprecated      bool                  `json:"deprecated,omitzero"`
+	AllowEmptyValue bool                  `json:"allowEmptyValue,omitzero"`
+	Style           string                `json:"style,omitempty"`
+	Explode         bool                  `json:"explode,omitzero"`
+	AllowReserved   bool                  `json:"allowReserved,omitzero"`
+	Schema          *spec.Schema          `json:"schema,omitzero"`
+	Content         map[string]*MediaType `json:"content,omitempty"`
+	Example         interface{}           `json:"example,omitempty"`
+	Examples        map[string]*Example   `json:"examples,omitempty"`
 }

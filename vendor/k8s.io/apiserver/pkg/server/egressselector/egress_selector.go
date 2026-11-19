@@ -22,24 +22,35 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	egressmetrics "k8s.io/apiserver/pkg/server/egressselector/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
-	utiltrace "k8s.io/utils/trace"
 	client "sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client"
 )
 
 var directDialer utilnet.DialFunc = http.DefaultTransport.(*http.Transport).DialContext
+
+// defaultDialTimeout matches http.DefaultTransport dial timeout
+const defaultDialTimeout = 30 * time.Second
+
+func init() {
+	client.Metrics.RegisterMetrics(legacyregistry.Registerer())
+}
 
 // EgressSelector is the map of network context type to context dialer, for network egress.
 type EgressSelector struct {
@@ -102,16 +113,27 @@ func lookupServiceName(name string) (EgressType, error) {
 }
 
 func tunnelHTTPConnect(proxyConn net.Conn, proxyAddress, addr string) (net.Conn, error) {
-	fmt.Fprintf(proxyConn, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", addr, "127.0.0.1")
-	br := bufio.NewReader(proxyConn)
+	if _, err := fmt.Fprintf(proxyConn, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", addr, "127.0.0.1"); err != nil {
+		_ = proxyConn.Close()
+		return nil, fmt.Errorf("writing CONNECT to %s via proxy %s failed: %w", addr, proxyAddress, err)
+	}
+
+	// As described in https://go.dev/issue/74633 a misbehaving proxy server
+	// can cause memory exhaustion in the client. The fix in https://go.dev/cl/698915
+	// only covers http.Transport users. Apply the same limit here.
+	//
+	// Limit the size of the response headers the proxy server can send us.
+	br := bufio.NewReader(io.LimitReader(proxyConn, http.DefaultMaxHeaderBytes))
+
 	res, err := http.ReadResponse(br, nil)
 	if err != nil {
-		proxyConn.Close()
+		_ = proxyConn.Close()
 		return nil, fmt.Errorf("reading HTTP response from CONNECT to %s via proxy %s failed: %v",
 			addr, proxyAddress, err)
 	}
 	if res.StatusCode != 200 {
-		proxyConn.Close()
+		_ = proxyConn.Close()
+		_ = res.Body.Close()
 		return nil, fmt.Errorf("proxy error from %s while dialing %s, code %d: %v",
 			proxyAddress, addr, res.StatusCode, res.Status)
 	}
@@ -121,7 +143,8 @@ func tunnelHTTPConnect(proxyConn net.Conn, proxyAddress, addr string) (net.Conn,
 	// TLS, and in TLS the client speaks first, so we know there's
 	// no unbuffered data. But we can double-check.
 	if br.Buffered() > 0 {
-		proxyConn.Close()
+		_ = proxyConn.Close()
+		_ = res.Body.Close()
 		return nil, fmt.Errorf("unexpected %d bytes of buffered data from CONNECT proxy %q",
 			br.Buffered(), proxyAddress)
 	}
@@ -130,6 +153,10 @@ func tunnelHTTPConnect(proxyConn net.Conn, proxyAddress, addr string) (net.Conn,
 
 type proxier interface {
 	// proxy returns a connection to addr.
+	//
+	// The provided Context must be non-nil and is used only while connecting to addr.
+	// If the context expires before the connection is established, an error is returned.
+	// Once successfully connected, expiration of the context will not affect the connection.
 	proxy(ctx context.Context, addr string) (net.Conn, error)
 }
 
@@ -141,23 +168,71 @@ type httpConnectProxier struct {
 }
 
 func (t *httpConnectProxier) proxy(ctx context.Context, addr string) (net.Conn, error) {
-	return tunnelHTTPConnect(t.conn, t.proxyAddress, addr)
+	var (
+		connectDone = make(chan struct{})
+		connectConn net.Conn
+		connectErr  error
+	)
+
+	go func() {
+		connectConn, connectErr = tunnelHTTPConnect(t.conn, t.proxyAddress, addr)
+		close(connectDone)
+	}()
+
+	select {
+	case <-connectDone:
+		return connectConn, connectErr
+
+	case <-ctx.Done():
+		// The CONNECT handshake may have completed concurrently with
+		// cancellation. Prefer the completed result before closing the
+		// connection.
+		select {
+		case <-connectDone:
+			return connectConn, connectErr
+		default:
+		}
+
+		_ = t.conn.Close()
+		return nil, fmt.Errorf("proxy CONNECT to %s failed: %w", addr, context.Cause(ctx))
+	}
 }
 
 var _ proxier = &grpcProxier{}
 
 type grpcProxier struct {
 	tunnel client.Tunnel
+	cancel context.CancelCauseFunc
 }
 
 func (g *grpcProxier) proxy(ctx context.Context, addr string) (net.Conn, error) {
-	return g.tunnel.DialContext(ctx, "tcp", addr)
+	c, err := g.tunnel.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		g.cancel(err)
+		return nil, err
+	}
+	return &grpcConn{Conn: c, cancel: g.cancel}, nil
+}
+
+type grpcConn struct {
+	net.Conn
+	cancel context.CancelCauseFunc
+}
+
+func (g *grpcConn) Close() error {
+	err := g.Conn.Close()
+	g.cancel(err)
+	return err
 }
 
 type proxyServerConnector interface {
 	// connect establishes connection to the proxy server, and returns a
 	// proxier based on the connection.
-	connect() (proxier, error)
+	//
+	// The provided Context must be non-nil. The context is used for connecting to the proxy only.
+	// If the context expires before the connection is complete, an error is returned.
+	// Once successfully connected to the proxy, any expiration of the context will not affect the connection.
+	connect(context.Context) (proxier, error)
 }
 
 type tcpHTTPConnectConnector struct {
@@ -165,8 +240,11 @@ type tcpHTTPConnectConnector struct {
 	tlsConfig    *tls.Config
 }
 
-func (t *tcpHTTPConnectConnector) connect() (proxier, error) {
-	conn, err := tls.Dial("tcp", t.proxyAddress, t.tlsConfig)
+func (t *tcpHTTPConnectConnector) connect(ctx context.Context) (proxier, error) {
+	d := tls.Dialer{
+		Config: t.tlsConfig,
+	}
+	conn, err := d.DialContext(ctx, "tcp", t.proxyAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -177,8 +255,9 @@ type udsHTTPConnectConnector struct {
 	udsName string
 }
 
-func (u *udsHTTPConnectConnector) connect() (proxier, error) {
-	conn, err := net.Dial("unix", u.udsName)
+func (u *udsHTTPConnectConnector) connect(ctx context.Context) (proxier, error) {
+	var d net.Dialer
+	conn, err := d.DialContext(ctx, "unix", u.udsName)
 	if err != nil {
 		return nil, err
 	}
@@ -189,22 +268,35 @@ type udsGRPCConnector struct {
 	udsName string
 }
 
-func (u *udsGRPCConnector) connect() (proxier, error) {
+// connect establishes a connection to a proxy over gRPC.
+func (u *udsGRPCConnector) connect(connectCtx context.Context) (proxier, error) {
 	udsName := u.udsName
-	dialOption := grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
-		c, err := net.Dial("unix", udsName)
+	dialOption := grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+		var d net.Dialer
+		c, err := d.DialContext(ctx, "unix", udsName)
 		if err != nil {
 			klog.Errorf("failed to create connection to uds name %s, error: %v", udsName, err)
 		}
 		return c, err
 	})
 
-	ctx := context.TODO()
-	tunnel, err := client.CreateSingleUseGrpcTunnel(ctx, udsName, dialOption, grpc.WithInsecure())
+	if _, ok := connectCtx.Deadline(); !ok {
+		// matches http.DefaultTransport dial timeout
+		var cancelConnect context.CancelFunc
+		connectCtx, cancelConnect = context.WithTimeout(connectCtx, defaultDialTimeout)
+		defer cancelConnect()
+	}
+
+	tunnelCtx, cancel := context.WithCancelCause(context.Background())
+	tunnel, err := client.CreateSingleUseGrpcTunnelWithContext(connectCtx, tunnelCtx, udsName, dialOption,
+		grpc.WithBlock(),
+		grpc.WithReturnConnectionError(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
+		cancel(err)
 		return nil, err
 	}
-	return &grpcProxier{tunnel: tunnel}, nil
+	return &grpcProxier{tunnel: tunnel, cancel: cancel}, nil
 }
 
 type dialerCreator struct {
@@ -223,10 +315,19 @@ func (d *dialerCreator) createDialer() utilnet.DialFunc {
 		return directDialer
 	}
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
-		trace := utiltrace.New(fmt.Sprintf("Proxy via %s protocol over %s", d.options.protocol, d.options.transport), utiltrace.Field{Key: "address", Value: addr})
-		defer trace.LogIfLong(500 * time.Millisecond)
+		if _, ok := ctx.Deadline(); !ok {
+			// Match the http default transport's dial timeout for
+			// callers without a deadline.
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, defaultDialTimeout)
+			defer cancel()
+		}
+
+		ctx, span := tracing.Start(ctx, fmt.Sprintf("Proxy via %s protocol over %s", d.options.protocol, d.options.transport), attribute.String("address", addr))
+		defer span.End(500 * time.Millisecond)
 		start := egressmetrics.Metrics.Clock().Now()
-		proxier, err := d.connector.connect()
+		egressmetrics.Metrics.ObserveDialStart(d.options.protocol, d.options.transport)
+		proxier, err := d.connector.connect(ctx)
 		if err != nil {
 			egressmetrics.Metrics.ObserveDialFailure(d.options.protocol, d.options.transport, egressmetrics.StageConnect)
 			return nil, err
@@ -251,7 +352,7 @@ func getTLSConfig(t *apiserver.TLSConfig) (*tls.Config, error) {
 	}
 	certPool := x509.NewCertPool()
 	if caCert != "" {
-		certBytes, err := ioutil.ReadFile(caCert)
+		certBytes, err := os.ReadFile(caCert)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read cert file %s, got %v", caCert, err)
 		}
@@ -266,6 +367,7 @@ func getTLSConfig(t *apiserver.TLSConfig) (*tls.Config, error) {
 	return &tls.Config{
 		Certificates: []tls.Certificate{clientCerts},
 		RootCAs:      certPool,
+		ServerName:   t.TLSServerName,
 	}, nil
 }
 

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -32,8 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
-	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
-	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/server"
@@ -143,16 +142,6 @@ type AuditWebhookOptions struct {
 	GroupVersionString string
 }
 
-// AuditDynamicOptions control the configuration of dynamic backends for audit events
-type AuditDynamicOptions struct {
-	// Enabled tells whether the dynamic audit capability is enabled.
-	Enabled bool
-
-	// Configuration for batching backend. This is currently only used as an override
-	// for integration tests
-	BatchConfig *pluginbuffered.BatchConfig
-}
-
 func NewAuditOptions() *AuditOptions {
 	return &AuditOptions{
 		WebhookOptions: AuditWebhookOptions{
@@ -165,6 +154,10 @@ func NewAuditOptions() *AuditOptions {
 			GroupVersionString: "audit.k8s.io/v1",
 		},
 		LogOptions: AuditLogOptions{
+			MaxSize:    100,
+			MaxAge:     366,
+			MaxBackups: 100,
+
 			Format: pluginlog.FormatJson,
 			BatchOptions: AuditBatchOptions{
 				Mode:        ModeBlocking,
@@ -235,8 +228,6 @@ func validateBackendBatchOptions(pluginName string, options AuditBatchOptions) e
 }
 
 var knownGroupVersions = []schema.GroupVersion{
-	auditv1alpha1.SchemeGroupVersion,
-	auditv1beta1.SchemeGroupVersion,
 	auditv1.SchemeGroupVersion,
 }
 
@@ -449,11 +440,11 @@ func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.Path, "audit-log-path", o.Path,
 		"If set, all requests coming to the apiserver will be logged to this file.  '-' means standard out.")
 	fs.IntVar(&o.MaxAge, "audit-log-maxage", o.MaxAge,
-		"The maximum number of days to retain old audit log files based on the timestamp encoded in their filename.")
+		"The maximum number of days to retain old audit log files based on the timestamp encoded in their filename. Setting a value of 0 means old audit log files are not removed based on age.")
 	fs.IntVar(&o.MaxBackups, "audit-log-maxbackup", o.MaxBackups,
 		"The maximum number of old audit log files to retain. Setting a value of 0 will mean there's no restriction on the number of files.")
 	fs.IntVar(&o.MaxSize, "audit-log-maxsize", o.MaxSize,
-		"The maximum size in megabytes of the audit log file before it gets rotated.")
+		"The maximum size in megabytes of the audit log file before it gets rotated. Setting to 0 disables rotation (not recommended).")
 	fs.StringVar(&o.Format, "audit-log-format", o.Format,
 		"Format of saved audits. \"legacy\" indicates 1-line text format for each event."+
 			" \"json\" indicates structured json format. Known formats are "+
@@ -519,6 +510,10 @@ func (o *AuditLogOptions) getWriter() (io.Writer, error) {
 		return nil, fmt.Errorf("ensureLogFile: %w", err)
 	}
 
+	if o.MaxSize == 0 {
+		return os.OpenFile(o.Path, os.O_APPEND|os.O_WRONLY, 0644)
+	}
+
 	return &lumberjack.Logger{
 		Filename:   o.Path,
 		MaxAge:     o.MaxAge,
@@ -529,6 +524,9 @@ func (o *AuditLogOptions) getWriter() (io.Writer, error) {
 }
 
 func (o *AuditLogOptions) ensureLogFile() error {
+	if err := os.MkdirAll(filepath.Dir(o.Path), 0700); err != nil {
+		return err
+	}
 	mode := os.FileMode(0600)
 	f, err := os.OpenFile(o.Path, os.O_CREATE|os.O_APPEND|os.O_RDWR, mode)
 	if err != nil {

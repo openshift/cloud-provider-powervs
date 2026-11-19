@@ -17,10 +17,11 @@ limitations under the License.
 package spec3
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 
+	"k8s.io/kube-openapi/pkg/internal"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	"github.com/go-openapi/swag"
 )
 
 // RequestBody describes a single request body, more at https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#requestBodyObject
@@ -34,32 +35,23 @@ type RequestBody struct {
 
 // MarshalJSON is a custom marshal function that knows how to encode RequestBody as JSON
 func (r *RequestBody) MarshalJSON() ([]byte, error) {
-	b1, err := json.Marshal(r.Refable)
-	if err != nil {
-		return nil, err
+	return internal.DeterministicMarshal(r)
+}
+
+func (r *RequestBody) MarshalJSONTo(enc *jsontext.Encoder) error {
+	var x struct {
+		Ref              string                   `json:"$ref,omitempty"`
+		RequestBodyProps requestBodyPropsOmitZero `json:",embed"`
+		Extensions       spec.Extensions          `json:",embed"`
 	}
-	b2, err := json.Marshal(r.RequestBodyProps)
-	if err != nil {
-		return nil, err
-	}
-	b3, err := json.Marshal(r.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	return swag.ConcatJSON(b1, b2, b3), nil
+	x.Ref = r.Refable.Ref.String()
+	x.Extensions = internal.SanitizeExtensions(r.Extensions)
+	x.RequestBodyProps = requestBodyPropsOmitZero(r.RequestBodyProps)
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 func (r *RequestBody) UnmarshalJSON(data []byte) error {
-	if err := json.Unmarshal(data, &r.Refable); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &r.RequestBodyProps); err != nil {
-		return err
-	}
-	if err := json.Unmarshal(data, &r.VendorExtensible); err != nil {
-		return err
-	}
-	return nil
+	return jsonv2.Unmarshal(data, r)
 }
 
 // RequestBodyProps describes a single request body, more at https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#requestBodyObject
@@ -70,4 +62,26 @@ type RequestBodyProps struct {
 	Content map[string]*MediaType `json:"content,omitempty"`
 	// Required determines if the request body is required in the request
 	Required bool `json:"required,omitempty"`
+}
+
+type requestBodyPropsOmitZero struct {
+	Description string                `json:"description,omitempty"`
+	Content     map[string]*MediaType `json:"content,omitempty"`
+	Required    bool                  `json:"required,omitzero"`
+}
+
+func (r *RequestBody) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	var x struct {
+		Extensions spec.Extensions `json:",embed"`
+		RequestBodyProps
+	}
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
+		return err
+	}
+	if err := internal.JSONRefFromMap(&r.Ref.Ref, x.Extensions); err != nil {
+		return err
+	}
+	r.Extensions = internal.SanitizeExtensions(x.Extensions)
+	r.RequestBodyProps = x.RequestBodyProps
+	return nil
 }

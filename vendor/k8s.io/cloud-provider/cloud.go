@@ -29,11 +29,22 @@ import (
 	restclient "k8s.io/client-go/rest"
 )
 
-// ControllerClientBuilder allows you to get clients and configs for controllers
+// ControllerClientBuilder allows you to get clients for controllers.
 // Please note a copy also exists in pkg/controller/client_builder.go
 // TODO: Make this depend on the separate controller utilities repo (issues/68947)
 type ControllerClientBuilder interface {
+	// Config returns a client config for the named controller.
+	//
+	// Deprecated: build clients through the builder so that they inherit the
+	// controller manager's client configuration and transport wrappers; a
+	// client built from a raw config bypasses them. The builder the cloud
+	// controller manager passes to Initialize also implements
+	// k8s.io/controller-manager/pkg/clientbuilder.TypedClientBuilder, which
+	// constructs the other client types; assert to it when one is needed.
 	Config(name string) (*restclient.Config, error)
+	// ConfigOrDie is Config, exiting the process on error.
+	//
+	// Deprecated: see Config.
 	ConfigOrDie(name string) *restclient.Config
 	Client(name string) (clientset.Interface, error)
 	ClientOrDie(name string) clientset.Interface
@@ -55,7 +66,8 @@ type Interface interface {
 	// disable calls to the Zones interface. Also returns true if the interface is supported, false otherwise.
 	InstancesV2() (InstancesV2, bool)
 	// Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
-	// DEPRECATED: Zones is deprecated in favor of retrieving zone/region information from InstancesV2.
+	//
+	// Deprecated: Zones is deprecated in favor of retrieving zone/region information from InstancesV2.
 	// This interface will not be called if InstancesV2 is enabled.
 	Zones() (Zones, bool)
 	// Clusters returns a clusters interface.  Also returns true if the interface is supported, false otherwise.
@@ -64,7 +76,12 @@ type Interface interface {
 	Routes() (Routes, bool)
 	// ProviderName returns the cloud provider ID.
 	ProviderName() string
-	// HasClusterID returns true if a ClusterID is required and set
+	// HasClusterID returns true if the cluster has a ClusterID set. The
+	// cloud-controller-manager checks this during cloud initialization at startup
+	// and exits on false unless the deprecated --allow-untagged-cloud flag is set.
+	// The framework only reads this boolean and never reads the ID itself, so how a
+	// provider stores and verifies it (for example, that instances carry the cluster
+	// tag) is up to the provider.
 	HasClusterID() bool
 }
 
@@ -98,6 +115,8 @@ func DefaultLoadBalancerName(service *v1.Service) string {
 }
 
 // GetInstanceProviderID builds a ProviderID for a node in a cloud.
+// Note that if the instance does not exist, we must return ("", cloudprovider.InstanceNotFound)
+// cloudprovider.InstanceNotFound should NOT be returned for instances that exist but are stopped/sleeping
 func GetInstanceProviderID(ctx context.Context, cloud Interface, nodeName types.NodeName) (string, error) {
 	instances, ok := cloud.Instances()
 	if !ok {
@@ -108,8 +127,11 @@ func GetInstanceProviderID(ctx context.Context, cloud Interface, nodeName types.
 		if err == NotImplemented {
 			return "", err
 		}
+		if err == InstanceNotFound {
+			return "", err
+		}
 
-		return "", fmt.Errorf("failed to get instance ID from cloud provider: %v", err)
+		return "", fmt.Errorf("failed to get instance ID from cloud provider: %w", err)
 	}
 	return cloud.ProviderName() + "://" + instanceID, nil
 }
@@ -131,11 +153,11 @@ func GetInstanceProviderID(ctx context.Context, cloud Interface, nodeName types.
 // irrespective of the ImplementedElsewhere error. Additional finalizers for
 // LB services must be managed in the alternate implementation.
 type LoadBalancer interface {
-	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	// GetLoadBalancer returns whether the specified load balancer exists, and
 	// if so, what its status is.
 	// Implementations must treat the *v1.Service parameter as read-only and not modify it.
-	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
+	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager.
+	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error)
 	// GetLoadBalancerName returns the name of the load balancer. Implementations must treat the
 	// *v1.Service parameter as read-only and not modify it.
@@ -143,7 +165,13 @@ type LoadBalancer interface {
 	// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
 	// Implementations must treat the *v1.Service and *v1.Node
 	// parameters as read-only and not modify them.
-	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
+	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager.
+	//
+	// Implementations may return a (possibly wrapped) api.RetryError to enforce
+	// backing off at a fixed duration. This can be used for cases like when the
+	// load balancer is not ready yet (e.g., it is still being provisioned) and
+	// polling at a fixed rate is preferred over backing off exponentially in
+	// order to minimize latency.
 	EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error)
 	// UpdateLoadBalancer updates hosts under the specified load balancer.
 	// Implementations must treat the *v1.Service and *v1.Node
@@ -218,6 +246,11 @@ type Route struct {
 	Name string
 	// TargetNode is the NodeName of the target instance.
 	TargetNode types.NodeName
+	// EnableNodeAddresses is a feature gate for TargetNodeAddresses. If false, ignore TargetNodeAddresses.
+	// Without this, if users haven't updated their cloud-provider, reconcile() will delete and create same route every time.
+	EnableNodeAddresses bool
+	// TargetNodeAddresses are the Node IPs of the target Node.
+	TargetNodeAddresses []v1.NodeAddress
 	// DestinationCIDR is the CIDR format IP range that this routing rule
 	// applies to.
 	DestinationCIDR string
@@ -253,7 +286,8 @@ type Zone struct {
 }
 
 // Zones is an abstract, pluggable interface for zone enumeration.
-// DEPRECATED: Zones is deprecated in favor of retrieving zone/region information from InstancesV2.
+//
+// Deprecated: Zones is deprecated in favor of retrieving zone/region information from InstancesV2.
 // This interface will not be called if InstancesV2 is enabled.
 type Zones interface {
 	// GetZone returns the Zone containing the current failure zone and locality region that the program is running in
@@ -274,6 +308,8 @@ type Zones interface {
 }
 
 // PVLabeler is an abstract, pluggable interface for fetching labels for volumes
+//
+// Deprecated: PVLabeler is deprecated in favor of CSI topology feature.
 type PVLabeler interface {
 	GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error)
 }
@@ -310,4 +346,19 @@ type InstanceMetadata struct {
 	//   * topology.kubernetes.io/region=<region>
 	//   * failure-domain.beta.kubernetes.io/region=<region> (DEPRECATED)
 	Region string
+
+	// AdditionalLabels is a map of additional labels provided by the cloud provider.
+	// When provided, they are applied during node initialization. If the
+	// CloudNodeAdditionalLabelsReconciliation feature gate is enabled, missing
+	// labels and changed values are also reconciled when the cloud node controller
+	// starts and every node status update interval afterwards (five minutes by
+	// default, configurable via --node-status-update-frequency). This feature gate
+	// is disabled by default. When enabled, provider values overwrite changes to
+	// the same labels made by other actors. Labels that are no longer returned by
+	// the cloud provider are not removed.
+	//
+	// The cloud node controller only reads this map. Providers must ensure it is
+	// not modified while the controller consumes it. Providers with mutable cached
+	// labels should return a copy made under their own synchronization.
+	AdditionalLabels map[string]string
 }

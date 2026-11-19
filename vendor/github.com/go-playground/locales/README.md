@@ -1,10 +1,8 @@
 ## locales
-<img align="right" src="https://raw.githubusercontent.com/go-playground/locales/master/logo.png">![Project status](https://img.shields.io/badge/version-0.14.0-green.svg)
+<img align="right" src="https://raw.githubusercontent.com/go-playground/locales/master/logo.png">![Project status](https://img.shields.io/badge/version-0.14.1-green.svg)
 [![Build Status](https://travis-ci.org/go-playground/locales.svg?branch=master)](https://travis-ci.org/go-playground/locales)
-[![Go Report Card](https://goreportcard.com/badge/github.com/go-playground/locales)](https://goreportcard.com/report/github.com/go-playground/locales)
 [![GoDoc](https://godoc.org/github.com/go-playground/locales?status.svg)](https://godoc.org/github.com/go-playground/locales)
 ![License](https://img.shields.io/dub/l/vibe-d.svg)
-[![Gitter](https://badges.gitter.im/go-playground/locales.svg)](https://gitter.im/go-playground/locales?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 Locales is a set of locales generated from the [Unicode CLDR Project](http://cldr.unicode.org/) which can be used independently or within
 an i18n package; these were built for use with, but not exclusive to, [Universal Translator](https://github.com/go-playground/universal-translator).
@@ -141,11 +139,13 @@ func main() {
 	fmt.Println(l.CardinalPluralRule(1.0, 1))
 	fmt.Println(l.CardinalPluralRule(3, 0))
 
-	// Ordinal Plural Rules
-	fmt.Println(l.OrdinalPluralRule(21, 0)) // 21st
-	fmt.Println(l.OrdinalPluralRule(22, 0)) // 22nd
-	fmt.Println(l.OrdinalPluralRule(33, 0)) // 33rd
-	fmt.Println(l.OrdinalPluralRule(34, 0)) // 34th
+	// Ordinal Plural Rules. The method returns the locales/plurals.Rule
+	// (e.g. One, Two, Few, Other) for the number; converting that rule into
+	// the actual suffix ("st", "nd", "rd", "th") is left to the caller.
+	fmt.Println(l.OrdinalPluralRule(21, 0)) // One   (-> "21st")
+	fmt.Println(l.OrdinalPluralRule(22, 0)) // Two   (-> "22nd")
+	fmt.Println(l.OrdinalPluralRule(33, 0)) // Few   (-> "33rd")
+	fmt.Println(l.OrdinalPluralRule(34, 0)) // Other (-> "34th")
 
 	// Range Plural Rules
 	fmt.Println(l.RangePluralRule(1, 0, 1, 0)) // 1-1

@@ -15,15 +15,25 @@
 package spec
 
 import (
-	"encoding/json"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 
-	"github.com/go-openapi/swag"
+	"k8s.io/kube-openapi/pkg/internal"
 )
 
 // ResponseProps properties specific to a response
 type ResponseProps struct {
 	Description string                 `json:"description,omitempty"`
 	Schema      *Schema                `json:"schema,omitempty"`
+	Headers     map[string]Header      `json:"headers,omitempty"`
+	Examples    map[string]interface{} `json:"examples,omitempty"`
+}
+
+// Marshaling structure only, always edit along with corresponding
+// struct (or compilation will fail).
+type responsePropsOmitZero struct {
+	Description string                 `json:"description,omitempty"`
+	Schema      *Schema                `json:"schema,omitzero"`
 	Headers     map[string]Header      `json:"headers,omitempty"`
 	Examples    map[string]interface{} `json:"examples,omitempty"`
 }
@@ -39,30 +49,43 @@ type Response struct {
 
 // UnmarshalJSON hydrates this items instance with the data from JSON
 func (r *Response) UnmarshalJSON(data []byte) error {
-	if err := json.Unmarshal(data, &r.ResponseProps); err != nil {
+	return jsonv2.Unmarshal(data, r)
+}
+
+func (r *Response) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	var x struct {
+		ResponseProps
+		Extensions Extensions `json:",embed"`
+	}
+
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(data, &r.Refable); err != nil {
+
+	if err := r.Refable.Ref.fromMap(x.Extensions); err != nil {
 		return err
 	}
-	return json.Unmarshal(data, &r.VendorExtensible)
+	r.Extensions = internal.SanitizeExtensions(x.Extensions)
+	r.ResponseProps = x.ResponseProps
+
+	return nil
 }
 
 // MarshalJSON converts this items object to JSON
 func (r Response) MarshalJSON() ([]byte, error) {
-	b1, err := json.Marshal(r.ResponseProps)
-	if err != nil {
-		return nil, err
+	return internal.DeterministicMarshal(r)
+}
+
+func (r Response) MarshalJSONTo(enc *jsontext.Encoder) error {
+	var x struct {
+		Ref           string                `json:"$ref,omitempty"`
+		Extensions    Extensions            `json:",embed"`
+		ResponseProps responsePropsOmitZero `json:",embed"`
 	}
-	b2, err := json.Marshal(r.Refable)
-	if err != nil {
-		return nil, err
-	}
-	b3, err := json.Marshal(r.VendorExtensible)
-	if err != nil {
-		return nil, err
-	}
-	return swag.ConcatJSON(b1, b2, b3), nil
+	x.Ref = r.Refable.Ref.String()
+	x.Extensions = internal.SanitizeExtensions(r.Extensions)
+	x.ResponseProps = responsePropsOmitZero(r.ResponseProps)
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 // NewResponse creates a new response instance

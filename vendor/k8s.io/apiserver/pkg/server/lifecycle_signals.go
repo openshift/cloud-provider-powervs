@@ -107,8 +107,8 @@ type lifecycleSignal interface {
 // for us to write unit tests that can verify expected graceful termination behavior.
 //
 // GenericAPIServer can use these to either:
-//  - signal that a particular termination event has transpired
-//  - wait for a designated termination event to transpire and do some action.
+//   - signal that a particular termination event has transpired
+//   - wait for a designated termination event to transpire and do some action.
 type lifecycleSignals struct {
 	// ShutdownInitiated event is signaled when an apiserver shutdown has been initiated.
 	// It is signaled when the `stopCh` provided by the main goroutine
@@ -119,6 +119,21 @@ type lifecycleSignals struct {
 	// has elapsed since the ShutdownInitiated event.
 	// ShutdownDelayDuration allows the apiserver to delay shutdown for some time.
 	AfterShutdownDelayDuration lifecycleSignal
+
+	// PreShutdownHooksStopped event is signaled when all registered
+	// preshutdown hook(s) have finished running.
+	PreShutdownHooksStopped lifecycleSignal
+
+	// NotAcceptingNewRequest event is signaled when the server is no
+	// longer accepting any new request, from this point on any new
+	// request will receive an error.
+	NotAcceptingNewRequest lifecycleSignal
+
+	// WatchRequestsDraining event is signaled when active watch
+	// request(s) should start returning, once the rate limiter that
+	// paces them is in effect. If ShutdownWatchTerminationGracePeriod
+	// is not positive, it is signaled right after NotAcceptingNewRequest.
+	WatchRequestsDraining lifecycleSignal
 
 	// InFlightRequestsDrained event is signaled when the existing requests
 	// in flight have completed. This is used as signal to shut down the audit backends
@@ -137,12 +152,28 @@ type lifecycleSignals struct {
 	MuxAndDiscoveryComplete lifecycleSignal
 }
 
+// ShuttingDown returns the lifecycle signal that is signaled when
+// the server is not accepting any new requests.
+// this is the lifecycle event that is exported to the request handler
+// logic to indicate that the server is shutting down.
+func (s lifecycleSignals) ShuttingDown() <-chan struct{} {
+	return s.NotAcceptingNewRequest.Signaled()
+}
+
+// DrainingWatches returns the lifecycle signal that starts draining active watch requests.
+func (s lifecycleSignals) DrainingWatches() <-chan struct{} {
+	return s.WatchRequestsDraining.Signaled()
+}
+
 // newLifecycleSignals returns an instance of lifecycleSignals interface to be used
 // to coordinate lifecycle of the apiserver
 func newLifecycleSignals() lifecycleSignals {
 	return lifecycleSignals{
 		ShutdownInitiated:          newNamedChannelWrapper("ShutdownInitiated"),
 		AfterShutdownDelayDuration: newNamedChannelWrapper("AfterShutdownDelayDuration"),
+		PreShutdownHooksStopped:    newNamedChannelWrapper("PreShutdownHooksStopped"),
+		NotAcceptingNewRequest:     newNamedChannelWrapper("NotAcceptingNewRequest"),
+		WatchRequestsDraining:      newNamedChannelWrapper("WatchRequestsDraining"),
 		InFlightRequestsDrained:    newNamedChannelWrapper("InFlightRequestsDrained"),
 		HTTPServerStoppedListening: newNamedChannelWrapper("HTTPServerStoppedListening"),
 		HasBeenReady:               newNamedChannelWrapper("HasBeenReady"),

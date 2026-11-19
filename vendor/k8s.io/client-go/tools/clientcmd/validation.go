@@ -25,6 +25,7 @@ import (
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation"
+	authexec "k8s.io/client-go/plugin/pkg/client/auth/exec"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
@@ -204,12 +205,27 @@ func ConfirmUsable(config clientcmdapi.Config, passedContextName string) error {
 
 	if exists {
 		validationErrors = append(validationErrors, validateContext(contextName, *context, config)...)
-		validationErrors = append(validationErrors, validateAuthInfo(context.AuthInfo, *config.AuthInfos[context.AuthInfo])...)
-		validationErrors = append(validationErrors, validateClusterInfo(context.Cluster, *config.Clusters[context.Cluster])...)
+
+		// Default to empty users and clusters and let the validation function report an error.
+		authInfo := config.AuthInfos[context.AuthInfo]
+		if authInfo == nil {
+			authInfo = &clientcmdapi.AuthInfo{}
+		}
+		validationErrors = append(validationErrors, validateAuthInfo(context.AuthInfo, *authInfo)...)
+
+		cluster := config.Clusters[context.Cluster]
+		if cluster == nil {
+			cluster = &clientcmdapi.Cluster{}
+		}
+		validationErrors = append(validationErrors, validateClusterInfo(context.Cluster, *cluster)...)
 	}
 
 	return newErrConfigurationInvalid(validationErrors)
 }
+
+// maxMinConnectionPoolSize is the largest min-connection-pool-size accepted in
+// a kubeconfig. Every unit is a separate transport created with the client.
+const maxMinConnectionPoolSize = 100
 
 // validateClusterInfo looks for conflicts and errors in the cluster info
 func validateClusterInfo(clusterName string, clusterInfo clientcmdapi.Cluster) []error {
@@ -231,6 +247,9 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdapi.Cluster) [
 		if _, err := parseProxyURL(proxyURL); err != nil {
 			validationErrors = append(validationErrors, fmt.Errorf("invalid 'proxy-url' %q for cluster %q: %w", proxyURL, clusterName, err))
 		}
+	}
+	if clusterInfo.MinConnectionPoolSize < 0 || clusterInfo.MinConnectionPoolSize > maxMinConnectionPoolSize {
+		validationErrors = append(validationErrors, fmt.Errorf("invalid 'min-connection-pool-size' %d for cluster %q: must be between 0 and %d", clusterInfo.MinConnectionPoolSize, clusterName, maxMinConnectionPoolSize))
 	}
 	// Make sure CA data and CA file aren't both specified
 	if len(clusterInfo.CertificateAuthority) != 0 && len(clusterInfo.CertificateAuthorityData) != 0 {
@@ -315,6 +334,10 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 			// These are valid
 		default:
 			validationErrors = append(validationErrors, fmt.Errorf("invalid interactiveMode for %v: %q", authInfoName, authInfo.Exec.InteractiveMode))
+		}
+
+		if err := authexec.ValidatePluginPolicy(authInfo.Exec.PluginPolicy); err != nil {
+			validationErrors = append(validationErrors, fmt.Errorf("allowlist misconfiguration: %w", err))
 		}
 	}
 
